@@ -21,6 +21,9 @@ const trackSchema = new mongoose.Schema(
       validate: [(qs) => qs.length === 4, 'questionSet must contain exactly 4 questions'],
     },
     competencyOrDomainList: [{ type: String }],
+    // Machine-readable controlled vocabulary from the pack: {labelField: [allowed values]}.
+    // The FR-10 validation layer fails closed when this is empty.
+    controlledVocabulary: { type: mongoose.Schema.Types.Mixed, default: {} },
     fallbackReviewerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     calibrationMode: { type: Boolean, default: true }, // FR-11; exits via GATE-1 (JP-owned)
   },

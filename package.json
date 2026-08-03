@@ -9,6 +9,7 @@
     "dev": "node server.js",
     "build": "node frontend/build.js",
     "seed": "node scripts/seed.js",
+    "load-packs": "node scripts/load-packs.js",
     "test": "vitest",
     "test:run": "vitest run",
     "test:tz": "TZ=UTC vitest run && TZ=Asia/Manila vitest run"
@@ -16,6 +17,7 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "connect-redis": "^9.0.0",
     "dotenv": "^16.3.1",
     "express": "^5.2.1",

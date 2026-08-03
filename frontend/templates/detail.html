@@ -1,0 +1,69 @@
+<script id="tpl-detail" type="text/ractive">
+  <div class="capture-head">
+    <button class="btn-quiet btn" on-click="@this.goHome()">← Back</button>
+    <h1>{{card.subject.name}}</h1>
+    <span class="topbar-spacer"></span>
+    <span class="stamp {{stampClass(card.status)}}" style="position: static; transform: rotate(-3deg);">{{statusLabel(card.status)}}</span>
+  </div>
+
+  <div class="record-meta" style="margin-bottom: 1.5rem;">
+    {{#if card.periodTag}}<span class="tag">{{card.periodTag}}</span>{{/if}}
+    <span>{{card.subject.kind}}</span>
+    {{#if card.packVersion}}<span>pack {{card.packVersion}}</span>{{/if}}
+  </div>
+
+  {{#if card.inCalibration}}
+    <div class="banner banner-info">
+      JP is calibrating this card. Your claims appear here once released — your words below are already on record.
+    </div>
+  {{/if}}
+
+  {{#if card.claims.length}}
+    <section>
+      <div class="section-label">Drafted claims <span class="count">{{card.claims.length}}</span></div>
+      {{#each card.claims}}
+        <article class="record">
+          <div class="record-head">
+            <span class="record-subject">{{.competencyOrDomain}}</span>
+          </div>
+          <div class="record-meta">
+            {{#each .labels:field}}<span class="tag">{{field}}: {{this}}</span>{{/each}}
+            {{#each .flags}}<span class="tag" style="color: var(--amber-ink);">{{this}}</span>{{/each}}
+            {{#if .countAfterMe !== null}}<span>{{.countAfterMe}} after me</span>{{/if}}
+          </div>
+          <p class="verbatim">“{{.sourceQuote}}”</p>
+          {{#if .involvement}}<p class="muted" style="font-size: var(--text-sm);">{{.involvement}}</p>{{/if}}
+        </article>
+      {{/each}}
+      <p class="muted" style="font-size: var(--text-sm);">
+        You approve or fix every line before anything routes — the confirm screen arrives in phase 4.
+      </p>
+    </section>
+  {{/if}}
+
+  {{#if card.followUps.length}}
+    <section>
+      <div class="section-label">Follow-ups</div>
+      {{#each card.followUps}}
+        <div class="sweep-panel"><p>{{.question}}</p></div>
+      {{/each}}
+    </section>
+  {{/if}}
+
+  <section>
+    <div class="section-label">Your words, on record</div>
+    {{#each card.rawAnswers}}
+      <div class="question-block">
+        {{#if .questionIndex !== null}}<span class="question-number">{{.questionIndex + 1}} / 4</span>{{/if}}
+        <div class="question-text">{{.question}}</div>
+        <p class="verbatim">{{.answer}}</p>
+      </div>
+    {{/each}}
+    {{#each card.sweepAnswers}}
+      <div class="question-block">
+        <span class="question-number">SWEEP</span>
+        <p class="verbatim">{{.answer}}</p>
+      </div>
+    {{/each}}
+  </section>
+</script>

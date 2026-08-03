@@ -49,7 +49,7 @@ const PAGES = {
   },
   'index.html': {
     css: ['variables', 'base', 'nav', 'buttons', 'forms', 'cards', 'capture', 'states'],
-    templates: ['home', 'capture'],
+    templates: ['home', 'capture', 'detail'],
     js: ['api', 'helpers', 'app'],
   },
   'lead.html': {

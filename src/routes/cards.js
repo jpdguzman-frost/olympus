@@ -13,7 +13,7 @@ const router = Router();
 // --- Home (FR-2): ladder position (P5 placeholder), confirmed, drafts ---
 router.get('/api/home', async (req, res, next) => {
   try {
-    const own = await cards.listOwnCards(req.currentUser);
+    const own = cards.presentCards(req.currentUser, await cards.listOwnCards(req.currentUser));
     const track = req.currentUser.track
       ? await Track.findOne({ key: req.currentUser.track })
       : null;
@@ -61,7 +61,7 @@ router.get('/api/queue', async (req, res, next) => {
 // --- Own cards ---
 router.get('/api/cards', async (req, res, next) => {
   try {
-    sendSuccess(res, await cards.listOwnCards(req.currentUser));
+    sendSuccess(res, cards.presentCards(req.currentUser, await cards.listOwnCards(req.currentUser)));
   } catch (err) {
     next(err);
   }
@@ -78,7 +78,8 @@ router.post('/api/cards', async (req, res, next) => {
 
 router.get('/api/cards/:id', async (req, res, next) => {
   try {
-    sendSuccess(res, await cards.getCardForRead(req.currentUser, req.params.id));
+    const card = await cards.getCardForRead(req.currentUser, req.params.id);
+    sendSuccess(res, cards.presentCard(req.currentUser, card));
   } catch (err) {
     next(err);
   }

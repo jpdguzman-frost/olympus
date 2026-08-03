@@ -20,6 +20,8 @@
       {{>home}}
     {{elseif view === 'capture'}}
       {{>capture}}
+    {{elseif view === 'detail'}}
+      {{>detail}}
     {{else}}
       <p class="loading">Opening the ledger…</p>
     {{/if}}
@@ -130,7 +132,11 @@
             </div>
             <div class="record-meta">
               <span class="tag">{{.periodTag}}</span>
-              <span>{{statusLabel(.status)}}</span>
+              {{#if .inCalibration}}<span>in calibration with JP</span>{{else}}<span>{{.claims.length}} drafted claims</span>{{/if}}
+            </div>
+            <div class="record-foot">
+              <span class="spacer"></span>
+              <button class="btn btn-secondary" on-click="@this.openCard(._id)">View</button>
             </div>
             <span class="stamp {{stampClass(.status)}}">{{statusLabel(.status)}}</span>
           </article>

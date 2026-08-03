@@ -6,6 +6,7 @@ const app = new Ractive({
   partials: {
     home: templateById('tpl-home'),
     capture: templateById('tpl-capture'),
+    detail: templateById('tpl-detail'),
   },
   data: {
     view: 'loading',
@@ -118,6 +119,10 @@ async function loadHome() {
 
 async function loadCapture(cardId) {
   const [card, home] = await Promise.all([api('GET', `/api/cards/${cardId}`), api('GET', '/api/home')]);
+  if (card.status !== 'draft') {
+    app.set({ view: 'detail', card });
+    return;
+  }
   const track = home.track || { questionSet: [], competencyOrDomainList: [] };
   const answers = ['', '', '', ''];
   let singleText = '';

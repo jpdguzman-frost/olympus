@@ -84,6 +84,23 @@ export async function createShell(actor, { reportUserId, subjectName, closeDate 
 // Reads (visibility matrix, Plan §4)
 // ---------------------------------------------------------------------------
 
+/**
+ * FR-11: while a card holds in calibration, its claims queue to Admin
+ * BEFORE the talent sees them. Everyone but admin gets the card with
+ * claims/follow-ups stripped and an inCalibration marker.
+ */
+export function presentCard(actor, card) {
+  const obj = typeof card.toObject === 'function' ? card.toObject() : card;
+  if (obj.calibrationHold && !actor.hasRole('admin')) {
+    return { ...obj, claims: [], followUps: [], inCalibration: true };
+  }
+  return obj;
+}
+
+export function presentCards(actor, cardsList) {
+  return cardsList.map((c) => presentCard(actor, c));
+}
+
 export async function getCardForRead(actor, cardId) {
   const card = await Card.findById(cardId);
   if (!card) throw notFound('Card not found');

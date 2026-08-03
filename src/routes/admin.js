@@ -13,6 +13,7 @@ import { VocabPackVersion } from '../models/VocabPackVersion.js';
 import { AuditLog } from '../models/AuditLog.js';
 import { Card } from '../models/Card.js';
 import { recordAudit } from '../services/auditService.js';
+import * as calibration from '../services/calibrationService.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { sendSuccess } from '../utils/responseEnvelope.js';
 import { ROLES, TRACK_KEYS } from '../config/constants.js';
@@ -105,6 +106,50 @@ router.post('/api/admin/tracks/:key/pack', async (req, res, next) => {
       before, after: { vocabPackVersion: version, packId: pack._id },
     });
     sendSuccess(res, track, 201);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Calibration review (FR-11; admin-only per Plan §4 matrix) ---
+router.get('/api/admin/calibration', async (req, res, next) => {
+  try {
+    sendSuccess(res, await calibration.listCalibrationQueue());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/admin/calibration/:cardId/claims/:claimId', async (req, res, next) => {
+  try {
+    sendSuccess(res, await calibration.correctClaim(req.currentUser, req.params.cardId, req.params.claimId, req.body ?? {}));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/admin/calibration/:cardId/release', async (req, res, next) => {
+  try {
+    sendSuccess(res, await calibration.releaseCard(req.currentUser, req.params.cardId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Calibration mode toggle — the GATE-1 exit decision is JP's (Invariant 14);
+// this endpoint only records it.
+router.post('/api/admin/tracks/:key/calibration-mode', async (req, res, next) => {
+  try {
+    const track = await Track.findOne({ key: req.params.key });
+    if (!track) throw notFound('Track not found');
+    const before = { calibrationMode: track.calibrationMode };
+    track.calibrationMode = Boolean(req.body?.on);
+    await track.save();
+    await recordAudit({
+      actorId: req.currentUser._id, action: 'track.calibration-mode', entity: 'track', entityId: track._id,
+      before, after: { calibrationMode: track.calibrationMode },
+    });
+    sendSuccess(res, track);
   } catch (err) {
     next(err);
   }

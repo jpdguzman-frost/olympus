@@ -41,6 +41,52 @@
     </section>
 
     <section>
+      <div class="section-label">Calibration queue <span class="count">{{calibration.length}}</span></div>
+      {{#if calibration.length}}
+        {{#each calibration}}
+          <article class="record">
+            <div class="record-head">
+              <span class="record-subject">{{.subject.name}}</span>
+            </div>
+            <div class="record-meta">
+              <span class="tag">{{.periodTag}}</span>
+              <span>{{.track}}</span>
+              <span>pack {{.packVersion}}</span>
+              <span>{{.claims.length}} claims</span>
+            </div>
+
+            {{#each .claims}}
+              <div style="border-top: 1px solid var(--rule); padding-top: 0.75rem; margin-top: 0.75rem;">
+                <div class="record-meta" style="margin-bottom: 0.4rem;">
+                  <strong style="color: var(--ink); font-family: var(--sans);">{{.competencyOrDomain}}</strong>
+                  {{#each .labels:field}}<span class="tag">{{field}}: {{this}}</span>{{/each}}
+                  {{#each .flags}}<span class="tag" style="color: var(--amber-ink);">{{this}}</span>{{/each}}
+                </div>
+                <p class="verbatim">“{{.sourceQuote}}”</p>
+                <div class="sweep-actions">
+                  <input type="text" value="{{.editLabels}}" placeholder='corrections e.g. execution: I run it'
+                    style="flex: 2; font-family: var(--mono); font-size: var(--text-xs);" />
+                  <button class="btn btn-secondary" on-click="@this.correctClaim(../../this, this)">Save correction</button>
+                  <button class="btn btn-danger" on-click="@this.removeClaim(../../this, this)">Remove claim</button>
+                </div>
+              </div>
+            {{/each}}
+
+            <div class="record-foot">
+              <span class="muted" style="font-size: var(--text-xs);">Corrections are validated against the pack and logged.</span>
+              <span class="spacer"></span>
+              <button class="btn btn-primary" on-click="@this.releaseCard(this)">Release to talent</button>
+            </div>
+          </article>
+        {{/each}}
+      {{else}}
+        <div class="empty-state">
+          Nothing waiting. Structured cards hold here while calibration mode is on — five consecutive clean cards across three talents per track is your exit gate.
+        </div>
+      {{/if}}
+    </section>
+
+    <section>
       <div class="section-label">Add a user</div>
       <div class="shell-form">
         <div class="form-row">

@@ -114,6 +114,14 @@ const cardSchema = new Schema(
     packVersion: { type: String, default: null }, // Invariant 1: records the pack that structured it
     createdViaShellBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // FR-5
     submittedForStructuringAt: { type: Date, default: null },
+    structuringAttempts: { type: Number, default: 0 },
+    structuringError: { type: String, default: null },
+    nextStructuringAttemptAt: { type: Date, default: null },
+    // FR-11: while calibration mode is on, structured cards hold for admin
+    // review before the talent sees the claims.
+    calibrationHold: { type: Boolean, default: false },
+    calibrationReleasedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    calibrationReleasedAt: { type: Date, default: null },
     audit: [auditEntrySchema],
   },
   { timestamps: true },
