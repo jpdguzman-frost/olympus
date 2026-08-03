@@ -1,0 +1,51 @@
+label.field {
+  display: block;
+  margin-bottom: 0.9rem;
+}
+label.field > .field-name {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: 0.3rem;
+}
+label.field > .field-hint {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  margin-top: 0.25rem;
+}
+
+input[type='text'],
+input[type='date'],
+select,
+textarea {
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--ink);
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.65rem;
+}
+textarea { min-height: 7rem; resize: vertical; line-height: 1.6; }
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--carbon);
+  box-shadow: 0 0 0 2px var(--carbon-soft);
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.form-row > * { flex: 1; min-width: 12rem; }
+
+.savestate {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+.savestate.saved { color: var(--stamp-green); }

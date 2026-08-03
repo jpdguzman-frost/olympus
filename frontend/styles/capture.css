@@ -1,0 +1,121 @@
+/* Capture — the interview. Questions are the fixed instrument (FR-3);
+   answers are the talent's own words, any language. */
+
+.capture-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.capture-head h1 { font-size: var(--text-xl); }
+
+.capture-shell-note {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  margin-bottom: 1rem;
+}
+
+/* FR-6: prior confirmed cards render ABOVE the input — reference only */
+.context-strip {
+  background: var(--carbon-soft);
+  border: 1px solid #d5d9f2;
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: var(--text-sm);
+}
+.context-strip .context-title {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--carbon);
+  margin-bottom: 0.4rem;
+}
+.context-strip ul { list-style: none; }
+.context-strip li { padding: 0.15rem 0; }
+.context-strip .note { color: var(--ink-muted); font-size: var(--text-xs); margin-top: 0.4rem; }
+
+/* Mode toggle */
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.mode-toggle button {
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: 0.45rem 0.9rem;
+  background: var(--surface);
+  border: none;
+  cursor: pointer;
+  color: var(--ink-muted);
+}
+.mode-toggle button.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* The four questions — a genuine sequence, numbered in mono ink */
+.question-block { margin-bottom: 1.6rem; }
+.question-number {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--carbon);
+  letter-spacing: 0.1em;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.question-text {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+.question-list {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.25rem;
+}
+.question-list .question-block { margin-bottom: 0.7rem; }
+.question-list .question-block:last-child { margin-bottom: 0; }
+.any-language {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  margin: 0.4rem 0 1.25rem;
+}
+
+/* Sweep */
+.sweep-panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--carbon);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  margin: 1.75rem 0;
+}
+.sweep-panel h2 { font-size: var(--text-base); margin-bottom: 0.35rem; }
+.sweep-panel .sweep-hint { font-size: var(--text-sm); color: var(--ink-muted); margin-bottom: 0.75rem; }
+.sweep-actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.6rem; flex-wrap: wrap; }
+
+.submit-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid var(--rule);
+  padding-top: 1.25rem;
+  margin-top: 1.5rem;
+}
+.submit-bar .spacer { flex: 1; }
+
+.banner {
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  font-size: var(--text-sm);
+  margin: 1rem 0;
+}
+.banner-safe { background: var(--stamp-green-soft); color: var(--stamp-green); border: 1px solid #cfe4d8; }
+.banner-info { background: var(--carbon-soft); color: var(--carbon); border: 1px solid #d5d9f2; }
+.banner-warn { background: var(--amber-soft); color: var(--amber-ink); border: 1px solid #e9d9b8; }

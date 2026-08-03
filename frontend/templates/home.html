@@ -1,0 +1,141 @@
+<script id="tpl-root" type="text/ractive">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="wordmark">OLYMPUS <span class="sub">· EVIDENCE</span></span>
+      <span class="topbar-spacer"></span>
+      {{#if me}}
+        <span class="whoami">
+          {{me.name}}
+          {{#each me.roles}}<span class="role-chip">{{this}}</span>{{/each}}
+        </span>
+        {{#if isLead}}<a href="/lead.html">Team</a>{{/if}}
+        {{#if isAdmin}}<a href="/admin.html">Admin</a>{{/if}}
+        <button class="linkish" on-click="@this.logout()">Sign out</button>
+      {{/if}}
+    </div>
+  </header>
+  <main class="wrap">
+    {{#if error}}<div class="error-note">{{error}}</div>{{/if}}
+    {{#if view === 'home'}}
+      {{>home}}
+    {{elseif view === 'capture'}}
+      {{>capture}}
+    {{else}}
+      <p class="loading">Opening the ledger…</p>
+    {{/if}}
+  </main>
+</script>
+
+<script id="tpl-home" type="text/ractive">
+  <div class="capture-head">
+    <h1>{{me.name.split(' ')[0]}}'s record</h1>
+    <span class="topbar-spacer"></span>
+    {{#if isTalent}}
+      <button class="btn btn-primary" on-click="@this.startCard()">Start a card</button>
+    {{/if}}
+  </div>
+
+  {{#if isTalent}}
+    <section>
+      <div class="section-label">Ladder</div>
+      <div class="ladder-pending">
+        <span class="meta">ARRIVES WITH THE READER · P5</span>
+        Your ladder position is read from confirmed evidence — never assigned.
+        The view lands in phase 5; the evidence you file now is what feeds it.
+      </div>
+    </section>
+  {{/if}}
+
+  {{#if queue.length}}
+    <section>
+      <div class="section-label">To review <span class="count">{{queue.length}}</span></div>
+      {{#each queue}}
+        <article class="record">
+          <div class="record-head">
+            <span class="record-subject">{{.subject.name}}</span>
+          </div>
+          <div class="record-meta">
+            <span class="tag">{{.periodTag}}</span>
+            <span>routed to you</span>
+          </div>
+          <div class="record-foot">
+            <span class="muted" style="font-size: var(--text-sm);">Verdicts open in phase 4.</span>
+          </div>
+          <span class="stamp stamp-inflight">Routed</span>
+        </article>
+      {{/each}}
+    </section>
+  {{/if}}
+
+  {{#if isTalent}}
+    <section>
+      <div class="section-label">On record <span class="count">{{home.confirmed.length}}</span></div>
+      {{#if home.confirmed.length}}
+        {{#each home.confirmed}}
+          <article class="record">
+            <div class="record-head">
+              <span class="record-subject">{{.subject.name}}</span>
+            </div>
+            <div class="record-meta">
+              <span class="tag">{{.periodTag}}</span>
+              <span>{{.subject.kind}}</span>
+              <span>{{.claims.length}} claims</span>
+            </div>
+            <span class="stamp stamp-confirmed">Confirmed</span>
+          </article>
+        {{/each}}
+      {{else}}
+        <div class="empty-state">Nothing on record yet. Confirmed cards land here with their stamp.</div>
+      {{/if}}
+    </section>
+
+    <section>
+      <div class="section-label">Open drafts <span class="count">{{home.drafts.length}}</span></div>
+      {{#if home.drafts.length}}
+        {{#each home.drafts}}
+          <article class="record">
+            <div class="record-head">
+              {{#if .subject.name}}
+                <span class="record-subject">{{.subject.name}}</span>
+              {{else}}
+                <span class="record-subject unnamed">Unnamed {{.subject.kind}}</span>
+              {{/if}}
+            </div>
+            <div class="record-meta">
+              {{#if .periodTag}}<span class="tag">{{.periodTag}}</span>{{/if}}
+              <span>{{answeredCount(this)}} of 4 answered</span>
+              {{#if .submittedForStructuringAt}}<span>sent for structuring</span>{{/if}}
+            </div>
+            <div class="record-foot">
+              <span class="spacer"></span>
+              <button class="btn btn-secondary" on-click="@this.openCard(._id)">Continue</button>
+            </div>
+            <span class="stamp stamp-draft">Draft</span>
+          </article>
+        {{/each}}
+      {{else}}
+        <div class="empty-state">
+          No open drafts. Start a card — four questions about real work, minutes not hours, any language.
+        </div>
+      {{/if}}
+    </section>
+
+    {{#if home.inFlight.length}}
+      <section>
+        <div class="section-label">In flight <span class="count">{{home.inFlight.length}}</span></div>
+        {{#each home.inFlight}}
+          <article class="record">
+            <div class="record-head">
+              <span class="record-subject">{{.subject.name}}</span>
+            </div>
+            <div class="record-meta">
+              <span class="tag">{{.periodTag}}</span>
+              <span>{{statusLabel(.status)}}</span>
+            </div>
+            <span class="stamp {{stampClass(.status)}}">{{statusLabel(.status)}}</span>
+          </article>
+        {{/each}}
+      </section>
+    {{/if}}
+  {{/if}}
+</script>

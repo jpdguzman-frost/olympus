@@ -1,0 +1,140 @@
+<script id="tpl-admin" type="text/ractive">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="wordmark">OLYMPUS <span class="sub">· ADMIN</span></span>
+      <span class="topbar-spacer"></span>
+      {{#if me}}
+        <span class="whoami">
+          {{me.name}}
+          {{#each me.roles}}<span class="role-chip">{{this}}</span>{{/each}}
+        </span>
+        <a href="/">Ledger</a>
+        <button class="linkish" on-click="@this.logout()">Sign out</button>
+      {{/if}}
+    </div>
+  </header>
+  <main class="wrap">
+    {{#if error}}<div class="error-note">{{error}}</div>{{/if}}
+    {{#if notice}}<div class="banner banner-safe">{{notice}}</div>{{/if}}
+
+    <div class="capture-head"><h1>Administration</h1></div>
+    <p class="muted" style="font-size: var(--text-sm); margin-bottom: 1rem;">
+      Users, tracks, and the audit trail. Verdicts are not writable here — by anyone, including you.
+    </p>
+
+    <section>
+      <div class="section-label">Tracks</div>
+      {{#each tracks}}
+        <div class="pack-panel">
+          <h3>{{.label}} <span class="meta">({{.key}})</span></h3>
+          {{#if .vocabPackVersion}}
+            <span class="meta">Vocabulary pack {{.vocabPackVersion}}</span>
+          {{else}}
+            <span class="pending">NO VOCABULARY PACK LOADED — structuring (P3) waits on it</span>
+          {{/if}}
+          <div class="record-meta" style="margin-top: 0.5rem;">
+            <span class="tag">{{#if .calibrationMode}}calibration ON{{else}}calibration off{{/if}}</span>
+            <span>{{.questionSet.length}} fixed questions</span>
+          </div>
+        </div>
+      {{/each}}
+    </section>
+
+    <section>
+      <div class="section-label">Add a user</div>
+      <div class="shell-form">
+        <div class="form-row">
+          <label class="field">
+            <span class="field-name">Name</span>
+            <input type="text" value="{{newUser.name}}" />
+          </label>
+          <label class="field">
+            <span class="field-name">Frost email</span>
+            <input type="text" value="{{newUser.email}}" placeholder="name@frostdesigngroup.com" />
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span class="field-name">Roles</span>
+            <span style="display: flex; gap: 1rem; padding-top: 0.4rem;">
+              {{#each roleOptions}}
+                <label style="display: inline-flex; gap: 0.35rem; align-items: center; font-size: var(--text-sm);">
+                  <input type="checkbox" name="{{newUser.roles}}" value="{{this}}" /> {{this}}
+                </label>
+              {{/each}}
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-name">Track</span>
+            <select value="{{newUser.track}}">
+              <option value="">none</option>
+              <option value="ops">ops</option>
+              <option value="artasset">artasset</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-name">Lead</span>
+            <select value="{{newUser.leadId}}">
+              <option value="">none</option>
+              {{#each leads}}
+                <option value="{{._id}}">{{.name}}</option>
+              {{/each}}
+            </select>
+          </label>
+        </div>
+        <button class="btn btn-primary" on-click="@this.addUser()"
+          disabled="{{!newUser.name || !newUser.email}}">Add user</button>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">Users <span class="count">{{users.length}}</span></div>
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Roles</th><th>Track</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            {{#each users}}
+              <tr>
+                <td>{{.name}}</td>
+                <td class="meta">{{.email}}</td>
+                <td><span class="chip-row">{{#each .roles}}<span class="role-chip">{{this}}</span>{{/each}}</span></td>
+                <td class="meta">{{#if .track}}{{.track}}{{else}}—{{/if}}</td>
+                <td class="meta">{{#if .active}}active{{else}}inactive{{/if}}</td>
+                <td>
+                  <button class="btn btn-quiet" on-click="@this.toggleActive(this)">
+                    {{#if .active}}Deactivate{{else}}Reactivate{{/if}}
+                  </button>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">Audit trail <span class="count">latest {{audit.length}}</span></div>
+      <div class="table-scroll">
+        <table class="ledger">
+          <thead>
+            <tr><th>When</th><th>Action</th><th>Entity</th></tr>
+          </thead>
+          <tbody>
+            {{#each audit}}
+              <tr>
+                <td class="meta">{{fmtDate(.createdAt)}}</td>
+                <td class="meta">{{.action}}</td>
+                <td class="meta">{{.entity}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" style="font-size: var(--text-xs); margin-top: 0.5rem;">
+        Append-only. Entries are never edited and never deleted.
+      </p>
+    </section>
+  </main>
+</script>

@@ -1,0 +1,26 @@
+.empty-state {
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.loading {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.error-note {
+  background: #f9e9e6;
+  border: 1px solid #e5c4bd;
+  color: var(--danger);
+  border-radius: var(--radius);
+  padding: 0.7rem 1rem;
+  font-size: var(--text-sm);
+  margin: 1rem 0;
+}

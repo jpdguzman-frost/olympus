@@ -1,0 +1,113 @@
+/* The evidence card — the ledger's record unit, and the page's signature. */
+
+.record {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 1rem 1.15rem;
+  margin-bottom: 0.9rem;
+}
+
+.record-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+.record-subject {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.record-subject.unnamed { color: var(--ink-faint); font-weight: 400; font-style: italic; }
+
+.record-meta {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+.record-meta .tag {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0 0.4rem;
+  background: var(--paper);
+}
+
+.record-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.8rem;
+}
+.record-foot .spacer { flex: 1; }
+
+/* Status stamp — inked, slightly off-square, unmistakably applied by hand */
+.stamp {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.9rem;
+  transform: rotate(-4deg);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  opacity: 0.9;
+}
+.stamp-confirmed { color: var(--stamp-green); background: var(--stamp-green-soft); }
+.stamp-draft { color: var(--ink-faint); background: var(--paper); }
+.stamp-adjust { color: var(--amber-ink); background: var(--amber-soft); }
+.stamp-inflight { color: var(--carbon); background: var(--carbon-soft); }
+
+/* Status track — the card's position in the pipeline, dots not bars */
+.status-track {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+.status-track .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+}
+.status-track .dot.done { background: var(--carbon); border-color: var(--carbon); }
+.status-track .dot.current {
+  background: var(--surface);
+  border-color: var(--carbon);
+  box-shadow: 0 0 0 2px var(--carbon-soft);
+}
+
+/* Verbatim words — testimony, set apart in serif italic (Invariant 9) */
+.verbatim {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--text-base);
+  color: var(--ink);
+  border-left: 2px solid var(--rule-strong);
+  padding-left: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+/* Ladder placeholder (P5) — honest about what is not built yet */
+.ladder-pending {
+  background: var(--surface);
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+.ladder-pending .meta { display: block; margin-bottom: 0.25rem; }

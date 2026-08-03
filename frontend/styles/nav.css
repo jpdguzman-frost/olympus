@@ -1,0 +1,55 @@
+/* Top bar — a file-reference header, not an app chrome. */
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+}
+.topbar-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0.7rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.wordmark {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  letter-spacing: 0.22em;
+  color: var(--ink);
+}
+.wordmark .sub {
+  color: var(--ink-faint);
+  letter-spacing: 0.08em;
+  font-weight: 400;
+}
+.topbar-spacer { flex: 1; }
+.whoami {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.role-chip {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0.1rem 0.45rem;
+  color: var(--ink-muted);
+  background: var(--paper);
+}
+.topbar .linkish {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--carbon);
+  cursor: pointer;
+  padding: 0;
+}
+.topbar .linkish:hover { text-decoration: underline; }

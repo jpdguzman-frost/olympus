@@ -1,0 +1,109 @@
+<script id="tpl-capture" type="text/ractive">
+  <div class="capture-head">
+    <button class="btn-quiet btn" on-click="@this.goHome()">← Back</button>
+    <h1>{{#if subjectName}}{{subjectName}}{{else}}New {{card.subject.kind}} card{{/if}}</h1>
+    <span class="topbar-spacer"></span>
+    <span class="savestate {{#if saveState === 'saved'}}saved{{/if}}">
+      {{#if saveState === 'saving'}}saving…{{elseif saveState === 'saved'}}saved{{else}}&nbsp;{{/if}}
+    </span>
+  </div>
+
+  {{#if card.createdViaShellBy}}
+    <p class="capture-shell-note">
+      Your lead opened this shell — the {{card.subject.kind}} name and close date only. Everything below is yours.
+    </p>
+  {{/if}}
+
+  {{#if context.length}}
+    <div class="context-strip">
+      <div class="context-title">Previously on record — reference only</div>
+      <ul>
+        {{#each context}}
+          <li><strong>{{.subject.name}}</strong> <span class="meta">{{.periodTag}} · {{.claims.length}} claims confirmed</span></li>
+        {{/each}}
+      </ul>
+      <div class="note">Nothing copies into your answers. New evidence comes only from what you write now.</div>
+    </div>
+  {{/if}}
+
+  <div class="form-row">
+    <label class="field">
+      <span class="field-name">{{#if card.subject.kind === 'account'}}Account{{else}}Project{{/if}} name</span>
+      <input type="text" value="{{subjectName}}" placeholder="Name it as you go" />
+    </label>
+    <label class="field">
+      <span class="field-name">Close date</span>
+      <input type="date" value="{{closeDateStr}}" />
+      {{#if card.periodTag}}<span class="field-hint">Files under <strong>{{card.periodTag}}</strong> — the quarter it closed, no matter when you file.</span>{{/if}}
+    </label>
+  </div>
+
+  <div class="section-label">The four questions</div>
+  <div class="question-list">
+    {{#each questions}}
+      <div class="question-block">
+        <span class="question-number">{{@index + 1}} / 4</span>
+        <div class="question-text">{{this}}</div>
+      </div>
+    {{/each}}
+  </div>
+  <p class="any-language">Answer in any language — English, Filipino, Taglish, whatever tells it best.</p>
+
+  <div class="mode-toggle" role="group" aria-label="Answer mode">
+    <button class="{{#if mode === 'guided'}}active{{/if}}" on-click="@this.setMode('guided')">Guided — one at a time</button>
+    <button class="{{#if mode === 'single-pass'}}active{{/if}}" on-click="@this.setMode('single-pass')">Single pass — tell it in one go</button>
+  </div>
+
+  {{#if mode === 'guided'}}
+    {{#each questions}}
+      {{#if @index <= guidedIndex}}
+        <div class="question-block">
+          <span class="question-number">{{@index + 1}} / 4</span>
+          <div class="question-text">{{this}}</div>
+          <textarea value="{{answers[@index]}}" placeholder="In your own words…"></textarea>
+        </div>
+      {{/if}}
+    {{/each}}
+    {{#if guidedIndex < 3}}
+      <button class="btn btn-secondary" on-click="@this.nextQuestion()">Next question</button>
+    {{/if}}
+  {{else}}
+    <div class="question-block">
+      <div class="question-text">All four, in one go</div>
+      <textarea value="{{singleText}}" rows="10" style="min-height: 14rem;"
+        placeholder="Tell it the way you'd tell a teammate — cover the four questions above as you go."></textarea>
+    </div>
+  {{/if}}
+
+  {{#if sweepVisible}}
+    <div class="sweep-panel">
+      <h2>One last sweep</h2>
+      <p class="sweep-hint">
+        Anything else you own on this {{card.subject.kind}} that didn't come up?
+        “Not me” is a perfectly good answer — it costs you nothing.
+        {{#if !track.competencyOrDomainList.length}}
+          <br /><span class="meta">The full coverage checklist arrives with the vocabulary pack.</span>
+        {{/if}}
+      </p>
+      <textarea value="{{sweepText}}" placeholder="Anything unmentioned — or “not me”"></textarea>
+      <div class="sweep-actions">
+        <button class="btn btn-secondary" on-click="@this.notMe()">Nothing else — not me for the rest</button>
+      </div>
+    </div>
+  {{/if}}
+
+  {{#if submitMessage}}
+    <div class="banner banner-safe">{{submitMessage}}</div>
+  {{/if}}
+  {{#if submitError}}
+    <div class="banner banner-warn">{{submitError}}</div>
+  {{/if}}
+
+  <div class="submit-bar">
+    <span class="muted" style="font-size: var(--text-sm);">
+      Your words save as you type. Structuring drafts claims from them — you approve every line before anything routes.
+    </span>
+    <span class="spacer"></span>
+    <button class="btn btn-primary" on-click="@this.submitCard()" disabled="{{!canSubmit}}">Send for structuring</button>
+  </div>
+</script>

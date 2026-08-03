@@ -1,0 +1,87 @@
+<script id="tpl-lead" type="text/ractive">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="wordmark">OLYMPUS <span class="sub">· TEAM</span></span>
+      <span class="topbar-spacer"></span>
+      {{#if me}}
+        <span class="whoami">
+          {{me.name}}
+          {{#each me.roles}}<span class="role-chip">{{this}}</span>{{/each}}
+        </span>
+        {{#if isTalent}}<a href="/">My record</a>{{/if}}
+        {{#if isAdmin}}<a href="/admin.html">Admin</a>{{/if}}
+        <button class="linkish" on-click="@this.logout()">Sign out</button>
+      {{/if}}
+    </div>
+  </header>
+  <main class="wrap">
+    {{#if error}}<div class="error-note">{{error}}</div>{{/if}}
+    {{#if notice}}<div class="banner banner-safe">{{notice}}</div>{{/if}}
+
+    <div class="capture-head"><h1>Your team's evidence</h1></div>
+
+    <section>
+      <div class="section-label">Open a card shell</div>
+      <div class="shell-form">
+        <div class="form-row">
+          <label class="field">
+            <span class="field-name">Report</span>
+            <select value="{{shellReportId}}">
+              <option value="">Choose…</option>
+              {{#each reports}}
+                <option value="{{._id}}">{{.name}} — {{.track}}</option>
+              {{/each}}
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-name">Account / project name</span>
+            <input type="text" value="{{shellSubject}}" placeholder="e.g. GCash Design Support" />
+          </label>
+          <label class="field">
+            <span class="field-name">Close date</span>
+            <input type="date" value="{{shellCloseDate}}" />
+          </label>
+        </div>
+        <button class="btn btn-primary" on-click="@this.createShell()"
+          disabled="{{!shellReportId || !shellSubject || !shellCloseDate}}">Open shell</button>
+        <p class="boundary-note">
+          A shell is the name and the close date — nothing else. The answers, the nominations, and the words are theirs.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">Reports <span class="count">{{reports.length}}</span></div>
+      {{#if reports.length}}
+        {{#each reports}}
+          <article class="record">
+            <div class="record-head"><span class="record-subject">{{.name}}</span></div>
+            <div class="record-meta"><span class="tag">{{.track}}</span><span>{{.email}}</span></div>
+          </article>
+        {{/each}}
+      {{else}}
+        <div class="empty-state">No reports are assigned to you yet.</div>
+      {{/if}}
+    </section>
+
+    <section>
+      <div class="section-label">Confirmed records <span class="count">{{cards.length}}</span></div>
+      {{#if cards.length}}
+        {{#each cards}}
+          <article class="record">
+            <div class="record-head"><span class="record-subject">{{.subject.name}}</span></div>
+            <div class="record-meta">
+              <span class="tag">{{.periodTag}}</span>
+              <span>{{.claims.length}} claims</span>
+            </div>
+            <span class="stamp stamp-confirmed">Confirmed</span>
+          </article>
+        {{/each}}
+      {{else}}
+        <div class="empty-state">
+          Confirmed cards from your reports appear here — counts and statuses only, never a ranking.
+        </div>
+      {{/if}}
+    </section>
+  </main>
+</script>

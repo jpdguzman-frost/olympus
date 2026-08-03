@@ -1,0 +1,72 @@
+body.login-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.login-card {
+  width: min(24rem, 92vw);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 2.25rem 2rem;
+  text-align: center;
+}
+.login-card .wordmark {
+  font-size: var(--text-base);
+  letter-spacing: 0.3em;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.login-card .instrument-line {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: block;
+  margin-bottom: 1.6rem;
+}
+.login-card .invitation {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--text-lg);
+  margin-bottom: 1.75rem;
+}
+.login-card .btn { width: 100%; }
+.login-card .domain-note {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  margin-top: 0.9rem;
+}
+
+.dev-picker { text-align: left; margin-top: 0.5rem; }
+.dev-picker .dev-note {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.6rem;
+  margin-bottom: 0.9rem;
+  text-align: center;
+}
+.dev-picker button.dev-user {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font: inherit;
+  font-size: var(--text-sm);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.45rem;
+  cursor: pointer;
+}
+.dev-picker button.dev-user:hover { border-color: var(--carbon); }
+.dev-picker .roles { font-family: var(--mono); font-size: var(--text-xs); color: var(--ink-faint); }
