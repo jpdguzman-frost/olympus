@@ -40,11 +40,34 @@
   {{#if isTalent}}
     <section>
       <div class="section-label">Ladder</div>
-      <div class="ladder-pending">
-        <span class="meta">ARRIVES WITH THE READER · P5</span>
-        Your ladder position is read from confirmed evidence — never assigned.
-        The view lands in phase 5; the evidence you file now is what feeds it.
-      </div>
+      {{#if ladder && ladder.level}}
+        <div class="record" style="border-left: 3px solid var(--carbon);">
+          <div class="record-head">
+            <span class="record-subject" style="font-size: var(--text-display);">{{ladder.level}}{{#if ladder.texture}} · {{ladder.texture}}{{/if}}</span>
+          </div>
+          <div class="record-meta">
+            <span class="tag">floor: {{ladder.floor}}</span>
+            <span>{{ladder.confirmedClaims}} confirmed claims on record</span>
+          </div>
+          {{#if ladder.basis}}
+            <p class="muted" style="font-size: var(--text-sm); margin-top: 0.5rem;">
+              Read from {{ladder.basis.competency}}{{#if ladder.basis.subject}} on {{ladder.basis.subject}}{{/if}}:
+            </p>
+            <p class="verbatim">“{{ladder.basis.quote}}”</p>
+          {{/if}}
+          {{#if ladder.honestGap}}
+            <p class="muted" style="font-size: var(--text-sm); margin-top: 0.75rem;"><strong>Your honest gap, in your words:</strong> {{ladder.honestGap}}</p>
+          {{/if}}
+          {{#each ladder.notes}}
+            <p class="muted" style="font-size: var(--text-xs); color: var(--amber-ink); margin-top: 0.3rem;">{{this}}</p>
+          {{/each}}
+        </div>
+      {{else}}
+        <div class="ladder-pending">
+          <span class="meta">READ FROM CONFIRMED EVIDENCE — NEVER ASSIGNED</span>
+          Nothing is on record yet. Your position appears here the moment your first card confirms.
+        </div>
+      {{/if}}
     </section>
   {{/if}}
 
@@ -123,6 +146,24 @@
         </div>
       {{/if}}
     </section>
+
+    {{#if quarterTags.length}}
+      <section>
+        <div class="section-label">By quarter</div>
+        {{#each quarterTags}}
+          <article class="record">
+            <div class="record-head"><span class="record-subject" style="font-family: var(--mono); font-size: var(--text-base);">{{this}}</span></div>
+            <div class="record-meta"><span>{{~/quarters[this].length}} confirmed card(s)</span></div>
+            {{#each ~/quarters[this]}}
+              <div class="record-meta" style="margin-top: 0.3rem;">
+                <span style="color: var(--ink); font-family: var(--sans);">{{.subject.name}}</span>
+                <span>{{.claims}} claims</span>
+              </div>
+            {{/each}}
+          </article>
+        {{/each}}
+      </section>
+    {{/if}}
 
     {{#if home.inFlight.length}}
       <section>

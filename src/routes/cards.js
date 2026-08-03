@@ -37,6 +37,43 @@ router.get('/api/home', async (req, res, next) => {
   }
 });
 
+// --- Reader (P5): ladder read (FR-19) + quarterly assembly (FR-20) ---
+router.get('/api/ladder', async (req, res, next) => {
+  try {
+    const { deriveFromCards } = await import('../services/readerService.js');
+    const confirmed = await cards.listOwnCards(req.currentUser);
+    const read = deriveFromCards(
+      req.currentUser.track,
+      confirmed.filter((c) => c.status === 'confirmed'),
+    );
+    const latestGap = confirmed.find((c) => c.honestGap)?.honestGap ?? null;
+    sendSuccess(res, { ...read, honestGap: latestGap });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/api/quarters', async (req, res, next) => {
+  try {
+    const own = await cards.listOwnCards(req.currentUser);
+    const confirmed = own.filter((c) => c.status === 'confirmed');
+    const byQuarter = {};
+    for (const card of confirmed) {
+      const tag = card.periodTag ?? 'untagged';
+      byQuarter[tag] = byQuarter[tag] || [];
+      byQuarter[tag].push({
+        _id: card._id,
+        subject: card.subject,
+        claims: card.claims.length,
+        status: card.status,
+      });
+    }
+    sendSuccess(res, byQuarter);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/api/me', (req, res) => {
   const u = req.currentUser;
   sendSuccess(res, { id: u.id, name: u.name, email: u.email, roles: u.roles, track: u.track });

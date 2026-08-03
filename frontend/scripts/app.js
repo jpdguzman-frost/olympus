@@ -17,6 +17,9 @@ const app = new Ractive({
     error: null,
     home: { confirmed: [], drafts: [], inFlight: [], track: null },
     queue: [],
+    ladder: null,
+    quarters: {},
+    quarterTags: [],
     // capture state
     card: null,
     track: { competencyOrDomainList: [] },
@@ -241,6 +244,10 @@ async function route() {
 async function loadHome() {
   const [home, queue] = await Promise.all([api('GET', '/api/home'), api('GET', '/api/queue')]);
   app.set({ home, queue, view: 'home' });
+  if (app.get('isTalent')) {
+    const [ladder, quarters] = await Promise.all([api('GET', '/api/ladder'), api('GET', '/api/quarters')]);
+    app.set({ ladder, quarters, quarterTags: Object.keys(quarters).sort().reverse() });
+  }
 }
 
 async function loadCapture(cardId) {

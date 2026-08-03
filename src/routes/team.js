@@ -47,4 +47,28 @@ router.get('/api/team/cards', requireRole('lead'), async (req, res, next) => {
   }
 });
 
+// FR-20: per-team quarterly assembly — counts and statuses only (Invariant 12)
+router.get('/api/team/quarters', requireRole('lead'), async (req, res, next) => {
+  try {
+    const confirmed = await cards.listTeamConfirmed(req.currentUser);
+    const reports = await User.find({ leadId: req.currentUser._id }, { name: 1 });
+    const names = Object.fromEntries(reports.map((r) => [r._id.toString(), r.name]));
+    const byQuarter = {};
+    for (const card of confirmed) {
+      const tag = card.periodTag ?? 'untagged';
+      byQuarter[tag] = byQuarter[tag] || [];
+      byQuarter[tag].push({
+        _id: card._id,
+        subject: card.subject,
+        talentName: names[card.talentId.toString()],
+        claims: card.claims.length,
+        status: card.status,
+      });
+    }
+    sendSuccess(res, byQuarter);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
