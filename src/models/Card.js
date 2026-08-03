@@ -68,6 +68,7 @@ const nominationSchema = new Schema(
     },
     routedTo: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     repeatStreak: { type: Number, default: 0 },
+    thinPool: { type: Boolean, default: false }, // FR-15: exception path, visibly marked
   },
   { _id: false },
 );

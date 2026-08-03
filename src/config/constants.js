@@ -21,7 +21,7 @@ export const CARD_STATUS_TRANSITIONS = {
   draft: ['structured'],
   structured: ['talent-approved'],
   'talent-approved': ['lead-nominee-review'],
-  'lead-nominee-review': ['routed'],
+  'lead-nominee-review': ['routed', 'talent-approved'], // reject returns the pick to the talent (FR-14)
   routed: ['confirmed', 'adjust'],
   adjust: ['revised'],
   revised: ['routed'],

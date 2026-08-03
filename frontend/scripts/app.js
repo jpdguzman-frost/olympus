@@ -34,11 +34,22 @@ const app = new Ractive({
     submitError: null,
     canSubmit: false,
     sweepVisible: false,
+    // detail/confirm state
+    isConfirmScreen: false,
+    isReviewScreen: false,
+    vocabFields: [],
+    approvedCount: 0,
+    nominating: false,
+    candidates: [],
+    nomineePick: [],
+    notice: null,
+    actionError: null,
     // helpers usable in templates
     statusLabel,
     stampClass,
     answeredCount,
     fmtDate,
+    flagNudge,
   },
 
   async logout() {
@@ -83,11 +94,126 @@ const app = new Ractive({
       if (result.structuring === 'pending-p3') {
         this.set(
           'submitMessage',
-          'On record. Your words are saved and nothing is lost — AI structuring arrives in phase 3 and will pick this card up.',
+          'On record. Your words are saved — structuring picks this card up within a minute.',
         );
       }
     } catch (err) {
       this.set('submitError', err.message);
+    }
+  },
+
+  // --- Confirm screen (FR-12) ---
+
+  async refreshDetail() {
+    await loadCapture(this.get('card._id'));
+  },
+
+  async approveClaim(claim) {
+    await this.claimAction(claim, { action: 'approve' });
+  },
+
+  startFix(claim, index) {
+    const editLabels = {};
+    for (const [field, value] of Object.entries(claim.labels || {})) editLabels[field] = value;
+    this.set(`card.claims.${index}.editLabels`, editLabels);
+    this.set(`card.claims.${index}.editing`, true);
+  },
+
+  async saveFix(claim, index) {
+    const picked = this.get(`card.claims.${index}.editLabels`) || {};
+    const labels = {};
+    for (const [field, value] of Object.entries(picked)) if (value) labels[field] = value;
+    await this.claimAction(claim, { action: 'fix', labels });
+  },
+
+  async removeClaim(claim) {
+    await this.claimAction(claim, { action: 'fix', remove: true });
+  },
+
+  async claimAction(claim, body) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/decide`, body);
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  async answerFollowUp(followUp) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/follow-ups/${followUp._id}/answer`, {
+        answer: followUp.answer,
+      });
+      this.set('notice', 'Answer saved with your words.');
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  async openNomination() {
+    this.set({ notice: null, actionError: null });
+    try {
+      if (this.get('card.status') === 'structured') {
+        await api('POST', `/api/cards/${this.get('card._id')}/approve`);
+        await this.refreshDetail();
+      }
+      const candidates = await api('GET', '/api/nominee-candidates');
+      this.set({ candidates, nominating: true, nomineePick: [] });
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  async submitNomination() {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/nominate`, {
+        nomineeIds: this.get('nomineePick'),
+      });
+      this.set({ nominating: false, notice: 'Sent to your Lead for exposure approval.' });
+      await this.refreshDetail();
+    } catch (err) {
+      const failures = err.failures?.map((f) => `${f.nominee}: ${f.reason}`).join(' · ');
+      this.set('actionError', failures || err.message);
+    }
+  },
+
+  async submitThinPool() {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/nominate`, { thinPool: true });
+      this.set({ nominating: false, notice: 'Routed through the fallback path, visibly marked.' });
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  async rerouteCard() {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/reroute`);
+      this.set('notice', 'Sent back to your reviewer.');
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  // --- Reviewer screen (FR-16) ---
+
+  async sendVerdict(claim, verdict) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/verdict`, {
+        verdict,
+        note: claim.adjustNote || null,
+      });
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
     }
   },
 });
@@ -120,7 +246,20 @@ async function loadHome() {
 async function loadCapture(cardId) {
   const [card, home] = await Promise.all([api('GET', `/api/cards/${cardId}`), api('GET', '/api/home')]);
   if (card.status !== 'draft') {
-    app.set({ view: 'detail', card });
+    const me = app.get('me');
+    const track = home.track || { controlledVocabulary: {} };
+    const isOwn = String(card.talentId) === String(me.id);
+    app.set({
+      view: 'detail',
+      card,
+      track,
+      isConfirmScreen: isOwn && !card.inCalibration && ['structured', 'adjust'].includes(card.status),
+      isReviewScreen: card.status === 'routed' && String(card.nomination?.routedTo) === String(me.id),
+      vocabFields: Object.keys(track.controlledVocabulary || {}),
+      approvedCount: (card.claims || []).filter((c) => c.talentApproved).length,
+      nominating: false,
+      nomineePick: [],
+    });
     return;
   }
   const track = home.track || { questionSet: [], competencyOrDomainList: [] };

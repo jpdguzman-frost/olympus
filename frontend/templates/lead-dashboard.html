@@ -51,6 +51,49 @@
     </section>
 
     <section>
+      <div class="section-label">Confirmer approvals <span class="count">{{queue.length}}</span></div>
+      {{#if queue.length}}
+        {{#each queue: qi}}
+          <article class="record">
+            <div class="record-head">
+              <span class="record-subject">{{.subject.name}}</span>
+              <span class="meta">{{.talentName}}</span>
+              {{#if .nomination.thinPool}}<span class="stamp stamp-adjust" style="position: static; transform: none;">THIN POOL</span>{{/if}}
+            </div>
+            <div class="record-meta">
+              <span class="tag">{{.periodTag}}</span>
+              <span>{{.claims.length}} claims, all approved by the talent</span>
+            </div>
+            {{#each .nomination.nominees}}
+              <div style="border-top: 1px solid var(--rule); padding-top: 0.6rem; margin-top: 0.6rem;">
+                <div class="record-meta">
+                  <strong style="color: var(--ink); font-family: var(--sans);">{{.name}}</strong>
+                  <span>{{.role}}</span>
+                  {{#if ~/queue[qi].repeatStreaks[.name] >= 2}}
+                    <span class="tag" style="color: var(--amber-ink);">
+                      same reviewer {{~/queue[qi].repeatStreaks[.name] + 1}} cards in a row — consider rotating (your call)
+                    </span>
+                  {{/if}}
+                </div>
+                <p class="muted" style="font-size: var(--text-xs);">
+                  exposure: {{~/queue[qi].nomination.systemChecks.exposure[.name] || 'fallback path'}}
+                </p>
+                <button class="btn btn-primary" on-click="@this.approveNominee(~/queue[qi], this)">Approve — route to {{.name}}</button>
+              </div>
+            {{/each}}
+            <div class="sweep-actions" style="margin-top: 0.75rem;">
+              <input type="text" value="{{.rejectReason}}" placeholder="Reason (required) — returns the pick to the talent" style="flex: 2;" />
+              <button class="btn btn-danger" on-click="@this.rejectNominee(this)">Reject nominees</button>
+            </div>
+            <p class="boundary-note" style="margin-top: 0.5rem;">You approve or reject with a reason. You never pick a substitute — that's theirs.</p>
+          </article>
+        {{/each}}
+      {{else}}
+        <div class="empty-state">No cards waiting on your confirmer approval.</div>
+      {{/if}}
+    </section>
+
+    <section>
       <div class="section-label">Reports <span class="count">{{reports.length}}</span></div>
       {{#if reports.length}}
         {{#each reports}}

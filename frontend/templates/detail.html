@@ -10,6 +10,7 @@
     {{#if card.periodTag}}<span class="tag">{{card.periodTag}}</span>{{/if}}
     <span>{{card.subject.kind}}</span>
     {{#if card.packVersion}}<span>pack {{card.packVersion}}</span>{{/if}}
+    {{#if card.stale}}<span class="tag" style="color: var(--amber-ink);">STALE — filed 60+ days after close; context, never a block</span>{{/if}}
   </div>
 
   {{#if card.inCalibration}}
@@ -18,40 +19,173 @@
     </div>
   {{/if}}
 
+  {{#if notice}}<div class="banner banner-safe">{{notice}}</div>{{/if}}
+  {{#if actionError}}<div class="banner banner-warn">{{actionError}}</div>{{/if}}
+
+  {{#if isConfirmScreen}}
+    <div class="banner banner-info">
+      {{#if card.status === 'adjust'}}
+        Your reviewer sent this back. Fix or re-approve the noted lines, then send it back for review.
+      {{else}}
+        These are drafted claims from your words. Approve each line, or fix it — nothing routes until every line is yours.
+      {{/if}}
+    </div>
+  {{/if}}
+
+  {{#if isReviewScreen}}
+    <div class="banner banner-info">
+      You were named by {{card.talentName || 'the talent'}} as exposed to this work. Confirm each claim against the quote,
+      or send it back with a note. Confirmed is the only accepting answer.
+    </div>
+  {{/if}}
+
   {{#if card.claims.length}}
     <section>
-      <div class="section-label">Drafted claims <span class="count">{{card.claims.length}}</span></div>
-      {{#each card.claims}}
+      <div class="section-label">Claims <span class="count">{{card.claims.length}}</span></div>
+      {{#each card.claims: ci}}
         <article class="record">
           <div class="record-head">
             <span class="record-subject">{{.competencyOrDomain}}</span>
+            {{#if .talentApproved && isConfirmScreen}}<span class="meta" style="color: var(--stamp-green);">approved by you</span>{{/if}}
+            {{#if .verdict}}<span class="stamp {{.verdict === 'Confirmed' ? 'stamp-confirmed' : 'stamp-adjust'}}" style="position: static; transform: none;">{{.verdict}}</span>{{/if}}
           </div>
           <div class="record-meta">
             {{#each .labels:field}}<span class="tag">{{field}}: {{this}}</span>{{/each}}
-            {{#each .flags}}<span class="tag" style="color: var(--amber-ink);">{{this}}</span>{{/each}}
             {{#if .countAfterMe !== null}}<span>{{.countAfterMe}} after me</span>{{/if}}
           </div>
+          {{#if .flags.length}}
+            <div style="margin-top: 0.4rem;">
+              {{#each .flags}}
+                <p class="muted" style="font-size: var(--text-sm); color: var(--amber-ink);">{{flagNudge(this)}}</p>
+              {{/each}}
+            </div>
+          {{/if}}
           <p class="verbatim">“{{.sourceQuote}}”</p>
           {{#if .involvement}}<p class="muted" style="font-size: var(--text-sm);">{{.involvement}}</p>{{/if}}
+          {{#if .verdictNote}}
+            <div class="banner banner-warn" style="margin: 0.6rem 0 0;">Reviewer's note: {{.verdictNote}}</div>
+          {{/if}}
+
+          {{#if isConfirmScreen && (!.talentApproved || card.status === 'adjust')}}
+            {{#if .editing}}
+              <div class="sweep-actions" style="flex-wrap: wrap;">
+                {{#each vocabFields: vi}}
+                  <label class="field" style="flex: 1; min-width: 14rem; margin: 0;">
+                    <span class="field-name" style="font-family: var(--mono); font-size: var(--text-xs);">{{this}}</span>
+                    <select value="{{~/card.claims[ci].editLabels[this]}}">
+                      <option value="">— leave out —</option>
+                      {{#each ~/track.controlledVocabulary[this]}}
+                        <option value="{{this}}">{{this}}</option>
+                      {{/each}}
+                    </select>
+                  </label>
+                {{/each}}
+                <button class="btn btn-primary" on-click="@this.saveFix(this, ci)">Save fix</button>
+                <button class="btn btn-quiet" on-click="@this.set('card.claims.' + ci + '.editing', false)">Cancel</button>
+              </div>
+            {{else}}
+              <div class="sweep-actions">
+                <button class="btn btn-primary" on-click="@this.approveClaim(this)">Approve — this is mine</button>
+                <button class="btn btn-secondary" on-click="@this.startFix(this, ci)">Fix the labels</button>
+                <button class="btn btn-danger" on-click="@this.removeClaim(this)">Not mine — remove</button>
+              </div>
+            {{/if}}
+          {{/if}}
+
+          {{#if isReviewScreen && !.verdict}}
+            <div class="sweep-actions" style="flex-wrap: wrap;">
+              <button class="btn btn-primary" on-click="@this.sendVerdict(this, 'Confirmed')">Confirmed — I saw this</button>
+              <input type="text" value="{{.adjustNote}}" placeholder="What doesn't match what you saw? (required for Adjust)" style="flex: 2;" />
+              <button class="btn btn-danger" on-click="@this.sendVerdict(this, 'Adjust')">Adjust</button>
+            </div>
+          {{/if}}
         </article>
       {{/each}}
-      <p class="muted" style="font-size: var(--text-sm);">
-        You approve or fix every line before anything routes — the confirm screen arrives in phase 4.
-      </p>
     </section>
   {{/if}}
 
-  {{#if card.followUps.length}}
+  {{#if card.followUps.length && isConfirmScreen}}
     <section>
       <div class="section-label">Follow-ups</div>
       {{#each card.followUps}}
-        <div class="sweep-panel"><p>{{.question}}</p></div>
+        <div class="sweep-panel">
+          <p style="margin-bottom: 0.5rem;">{{.question}}</p>
+          <textarea value="{{.answer}}" placeholder="In your own words — “not me” costs nothing"></textarea>
+          <div class="sweep-actions">
+            <button class="btn btn-secondary" on-click="@this.answerFollowUp(this)">Save answer</button>
+          </div>
+        </div>
       {{/each}}
     </section>
   {{/if}}
 
+  {{#if isConfirmScreen && card.status === 'structured'}}
+    <div class="submit-bar">
+      <span class="muted" style="font-size: var(--text-sm);">
+        {{approvedCount}} of {{card.claims.length}} lines approved.
+      </span>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" on-click="@this.openNomination()" disabled="{{approvedCount < card.claims.length || !card.claims.length}}">
+        Approve all — choose confirmers
+      </button>
+    </div>
+
+    {{#if nominating}}
+      <section>
+        <div class="section-label">Nominate 1–2 confirmers</div>
+        <div class="shell-form">
+          <p class="muted" style="font-size: var(--text-sm); margin-bottom: 0.75rem;">
+            Someone exposed to this work — not your Lead. Your Lead approves the exposure; they can reject
+            with a reason, but they can never swap in their own pick.
+          </p>
+          {{#each candidates}}
+            <label style="display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0; font-size: var(--text-sm);">
+              <input type="checkbox" name="{{~/nomineePick}}" value="{{._id}}" />
+              {{.name}} <span class="meta">{{#if .track}}{{.track}}{{/if}}</span>
+            </label>
+          {{/each}}
+          <div class="sweep-actions" style="margin-top: 0.75rem;">
+            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick.length || nomineePick.length > 2}}">Send to my Lead</button>
+            <button class="btn btn-secondary" on-click="@this.submitThinPool()">No valid confirmer exists — use the fallback path</button>
+          </div>
+        </div>
+      </section>
+    {{/if}}
+  {{/if}}
+
+  {{#if isConfirmScreen && card.status === 'adjust'}}
+    <div class="submit-bar">
+      <span class="muted" style="font-size: var(--text-sm);">Fix or re-approve the returned lines, then send it back.</span>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" on-click="@this.rerouteCard()">Send back for review</button>
+    </div>
+  {{/if}}
+
+  {{#if card.nomination && card.nomination.leadDecision && card.nomination.leadDecision.action === 'reject' && card.status === 'talent-approved'}}
+    <div class="banner banner-warn">
+      Your Lead returned your pick: “{{card.nomination.leadDecision.reason}}” — nominate someone else.
+    </div>
+    <button class="btn btn-primary" on-click="@this.openNomination()">Choose confirmers</button>
+    {{#if nominating}}
+      <section>
+        <div class="section-label">Nominate 1–2 confirmers</div>
+        <div class="shell-form">
+          {{#each candidates}}
+            <label style="display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0; font-size: var(--text-sm);">
+              <input type="checkbox" name="{{~/nomineePick}}" value="{{._id}}" />
+              {{.name}} <span class="meta">{{#if .track}}{{.track}}{{/if}}</span>
+            </label>
+          {{/each}}
+          <div class="sweep-actions" style="margin-top: 0.75rem;">
+            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick.length || nomineePick.length > 2}}">Send to my Lead</button>
+          </div>
+        </div>
+      </section>
+    {{/if}}
+  {{/if}}
+
   <section>
-    <div class="section-label">Your words, on record</div>
+    <div class="section-label">The words, on record</div>
     {{#each card.rawAnswers}}
       <div class="question-block">
         {{#if .questionIndex !== null}}<span class="question-number">{{.questionIndex + 1}} / 4</span>{{/if}}

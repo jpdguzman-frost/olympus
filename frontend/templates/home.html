@@ -61,7 +61,9 @@
             <span>routed to you</span>
           </div>
           <div class="record-foot">
-            <span class="muted" style="font-size: var(--text-sm);">Verdicts open in phase 4.</span>
+            <span class="muted" style="font-size: var(--text-sm);">Confirm what you saw, or send it back with a note.</span>
+            <span class="spacer"></span>
+            <button class="btn btn-primary" on-click="@this.openCard(._id)">Review</button>
           </div>
           <span class="stamp stamp-inflight">Routed</span>
         </article>

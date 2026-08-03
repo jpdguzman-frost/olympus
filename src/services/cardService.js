@@ -89,8 +89,14 @@ export async function createShell(actor, { reportUserId, subjectName, closeDate 
  * BEFORE the talent sees them. Everyone but admin gets the card with
  * claims/follow-ups stripped and an inCalibration marker.
  */
+const STALE_MS = 60 * 24 * 60 * 60 * 1000;
+
 export function presentCard(actor, card) {
   const obj = typeof card.toObject === 'function' ? card.toObject() : card;
+  // BR-4: filed 60+ days after close carries STALE — context, never a block.
+  if (obj.filedDate && obj.closeDate && new Date(obj.filedDate) - new Date(obj.closeDate) > STALE_MS) {
+    obj.stale = true;
+  }
   if (obj.calibrationHold && !actor.hasRole('admin')) {
     return { ...obj, claims: [], followUps: [], inCalibration: true };
   }
@@ -233,59 +239,10 @@ export async function submitForStructuring(actor, cardId) {
 }
 
 // ---------------------------------------------------------------------------
-// Nomination (talent tags; lead approves/rejects with reason; NOBODY substitutes)
+// Nomination lives in confirmService (P4): talent tags via submitNomination
+// with FR-13 system checks; lead selects-or-rejects via decideNomination.
+// NOBODY substitutes (Invariant 4).
 // ---------------------------------------------------------------------------
-
-export async function setNominees(actor, cardId, nominees = []) {
-  const card = await Card.findById(cardId);
-  if (!card) throw notFound('Card not found');
-  assertOwnCard(actor, card); // Plan §4: nominee tag — talent, own card only
-  if (!actor.hasRole('talent')) throw forbidden('Only talent can nominate confirmers');
-  if (!Array.isArray(nominees) || nominees.length < 1 || nominees.length > 2) {
-    throw badRequest('Nominate 1–2 confirmers');
-  }
-
-  const before = card.nomination?.nominees?.map((n) => n.name) ?? [];
-  card.nomination.nominees = nominees.map((n) => ({ userId: n.userId, name: n.name, role: n.role }));
-  card.nomination.leadDecision = { action: null, reason: null, by: null, at: null };
-  pushCardAudit(card, { by: actor._id, action: 'nominees-set', before, after: nominees.map((n) => n.name) });
-  await card.save();
-  await recordAudit({ actorId: actor._id, action: 'card.set-nominees', entity: 'card', entityId: card._id });
-  return card;
-}
-
-/**
- * FR-14 / Invariant 4: approve, or reject WITH a reason. There is no
- * substitution parameter and no code path that writes a lead-chosen
- * nominee — rejection returns the pick to the talent, full stop.
- */
-export async function leadNomineeDecision(actor, cardId, { action, reason = null }) {
-  const card = await Card.findById(cardId);
-  if (!card) throw notFound('Card not found');
-  if (!actor.hasRole('lead')) throw forbidden('Only a lead can decide on nominees');
-
-  const talent = await User.findById(card.talentId);
-  if (!talent?.leadId?.equals?.(actor._id)) {
-    throw forbidden('You can only decide for your own reports');
-  }
-  if (!['approve', 'reject'].includes(action)) throw badRequest('Decision is approve or reject');
-  if (action === 'reject' && !reason?.trim()) {
-    throw badRequest('A rejection requires a stated reason — it returns the pick to the talent');
-  }
-  if (!card.nomination?.nominees?.length) throw conflict('No nominees to decide on');
-
-  card.nomination.leadDecision = { action, reason, by: actor._id, at: new Date() };
-  pushCardAudit(card, { by: actor._id, action: `nominee-${action}`, note: reason });
-  await card.save();
-  await recordAudit({
-    actorId: actor._id,
-    action: `card.nominee-${action}`,
-    entity: 'card',
-    entityId: card._id,
-    after: { action, reason },
-  });
-  return card;
-}
 
 // ---------------------------------------------------------------------------
 // Verdict (Invariant 3 — the sovereignty guard)
@@ -319,6 +276,9 @@ export async function applyVerdict(actor, cardId, claimId, { verdict, note = nul
   claim.verdictNote = note;
   claim.verdictBy = actor._id;
   claim.verdictAt = new Date();
+  // BR-7: Adjust returns the claim to the talent — their prior approval
+  // no longer stands; revision requires a fresh approve or fix.
+  if (verdict === 'Adjust') claim.talentApproved = false;
   pushCardAudit(card, {
     by: actor._id,
     action: 'verdict',

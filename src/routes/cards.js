@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { Track } from '../models/Track.js';
 import * as cards from '../services/cardService.js';
+import * as confirm from '../services/confirmService.js';
 import { sendSuccess } from '../utils/responseEnvelope.js';
 
 const router = Router();
@@ -27,6 +28,7 @@ router.get('/api/home', async (req, res, next) => {
         label: track.label,
         questionSet: track.questionSet,
         competencyOrDomainList: track.competencyOrDomainList,
+        controlledVocabulary: track.controlledVocabulary,
         vocabPackVersion: track.vocabPackVersion,
       },
     });
@@ -101,18 +103,61 @@ router.post('/api/cards/:id/submit', async (req, res, next) => {
   }
 });
 
-// --- Nomination (Plan §4: talent tags; lead decides; nobody substitutes) ---
-router.post('/api/cards/:id/nominees', async (req, res, next) => {
+// --- Confirm flow (FR-12): per-claim approve/fix, follow-ups, full approval ---
+router.post('/api/cards/:id/claims/:claimId/decide', async (req, res, next) => {
   try {
-    sendSuccess(res, await cards.setNominees(req.currentUser, req.params.id, req.body?.nominees));
+    sendSuccess(res, await confirm.decideClaim(req.currentUser, req.params.id, req.params.claimId, req.body ?? {}));
   } catch (err) {
     next(err);
   }
 });
 
+router.post('/api/cards/:id/follow-ups/:followUpId/answer', async (req, res, next) => {
+  try {
+    sendSuccess(res, await confirm.answerFollowUp(req.currentUser, req.params.id, req.params.followUpId, req.body?.answer));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/cards/:id/approve', async (req, res, next) => {
+  try {
+    sendSuccess(res, await confirm.approveCard(req.currentUser, req.params.id, req.body ?? {}));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Nomination (FR-13/FR-15: talent tags with system checks; nobody substitutes) ---
+router.get('/api/nominee-candidates', async (req, res, next) => {
+  try {
+    sendSuccess(res, await confirm.nomineeCandidates(req.currentUser));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/cards/:id/nominate', async (req, res, next) => {
+  try {
+    sendSuccess(res, await confirm.submitNomination(req.currentUser, req.params.id, req.body ?? {}));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Lead decision (FR-14/FR-17: select among the talent's nominees, or reject) ---
 router.post('/api/cards/:id/nominee-decision', async (req, res, next) => {
   try {
-    sendSuccess(res, await cards.leadNomineeDecision(req.currentUser, req.params.id, req.body ?? {}));
+    sendSuccess(res, await confirm.decideNomination(req.currentUser, req.params.id, req.body ?? {}));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Adjust → revise → re-route (FR-16) ---
+router.post('/api/cards/:id/reroute', async (req, res, next) => {
+  try {
+    sendSuccess(res, await confirm.rerouteAfterRevision(req.currentUser, req.params.id));
   } catch (err) {
     next(err);
   }

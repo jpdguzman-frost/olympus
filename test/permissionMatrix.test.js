@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { makeTestContext, routeCardTo } from './helpers/testApp.js';
+import { makeTestContext, routeCardTo, talentApproveFixture } from './helpers/testApp.js';
 
 let ctx;
 let agents; // per-role supertest agents with live sessions
@@ -88,42 +88,80 @@ describe('card shell — lead only, own reports only, name+date only', () => {
   });
 });
 
-describe('nominee tag — talent, own card only', () => {
-  it('talent nominates on their own card', async () => {
+describe('nominee tag — talent, own card only, after their approval (FR-13)', () => {
+  async function approvedCard() {
     const card = await makeDraft(agents.talentA);
-    const res = await agents.talentA.post(`/api/cards/${card._id}/nominees`).send({
-      nominees: [{ userId: ctx.users.reviewer._id.toString(), name: 'Reviewer', role: 'peer' }],
+    await talentApproveFixture(card._id, ctx.users.talentA._id);
+    return card;
+  }
+
+  it('talent nominates on their own approved card', async () => {
+    const card = await approvedCard();
+    const res = await agents.talentA.post(`/api/cards/${card._id}/nominate`).send({
+      nomineeIds: [ctx.users.reviewer._id.toString()],
     });
     expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('lead-nominee-review');
   });
 
-  it('lead cannot set nominees — no substitution surface (Invariant 4)', async () => {
+  it('nomination before approval is refused (Invariant 5: nothing routes early)', async () => {
     const card = await makeDraft(agents.talentA);
-    const res = await agents.lead.post(`/api/cards/${card._id}/nominees`).send({
-      nominees: [{ userId: ctx.users.lead._id.toString(), name: 'Lead pick', role: 'peer' }],
+    const res = await agents.talentA.post(`/api/cards/${card._id}/nominate`).send({
+      nomineeIds: [ctx.users.reviewer._id.toString()],
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it('lead cannot nominate — no substitution surface (Invariant 4)', async () => {
+    const card = await approvedCard();
+    const res = await agents.lead.post(`/api/cards/${card._id}/nominate`).send({
+      nomineeIds: [ctx.users.lead._id.toString()],
     });
     expect([403, 404]).toContain(res.status);
   });
 
-  it('admin cannot set nominees either', async () => {
-    const card = await makeDraft(agents.talentA);
-    const res = await agents.admin.post(`/api/cards/${card._id}/nominees`).send({
-      nominees: [{ userId: ctx.users.reviewer._id.toString(), name: 'R', role: 'peer' }],
+  it('admin cannot nominate either', async () => {
+    const card = await approvedCard();
+    const res = await agents.admin.post(`/api/cards/${card._id}/nominate`).send({
+      nomineeIds: [ctx.users.reviewer._id.toString()],
     });
     expect([403, 404]).toContain(res.status);
+  });
+
+  it('advocate block: the talent\'s own lead is returned with a reason (FR-13a)', async () => {
+    const card = await approvedCard();
+    const res = await agents.talentA.post(`/api/cards/${card._id}/nominate`).send({
+      nomineeIds: [ctx.users.lead._id.toString()],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.failures[0].reason).toMatch(/advocate block/);
+  });
+
+  it('advocate block: a named call-maker on the card is returned with a reason', async () => {
+    const card = await makeDraft(agents.talentA);
+    await agents.talentA.patch(`/api/cards/${card._id}`).send({
+      rawAnswers: [{ questionIndex: 0, question: 'Q1', answer: 'Reviewer decided the schedule, I executed it.' }],
+    });
+    await talentApproveFixture(card._id, ctx.users.talentA._id);
+    const res = await agents.talentA.post(`/api/cards/${card._id}/nominate`).send({
+      nomineeIds: [ctx.users.reviewer._id.toString()],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.failures[0].reason).toMatch(/named on the card/);
   });
 });
 
-describe('nominee approve/reject — lead only, reason required on reject', () => {
+describe('nominee approve/reject — lead selects among the talent\'s picks (FR-14)', () => {
   async function nominatedCard() {
     const card = await makeDraft(agents.talentA);
-    await agents.talentA.post(`/api/cards/${card._id}/nominees`).send({
-      nominees: [{ userId: ctx.users.reviewer._id.toString(), name: 'Reviewer', role: 'peer' }],
+    await talentApproveFixture(card._id, ctx.users.talentA._id);
+    await agents.talentA.post(`/api/cards/${card._id}/nominate`).send({
+      nomineeIds: [ctx.users.reviewer._id.toString()],
     });
     return card;
   }
 
-  it('lead rejects WITH a reason — returns pick to talent', async () => {
+  it('lead rejects WITH a reason — the card returns to the talent', async () => {
     const card = await nominatedCard();
     const res = await agents.lead.post(`/api/cards/${card._id}/nominee-decision`).send({
       action: 'reject',
@@ -131,6 +169,7 @@ describe('nominee approve/reject — lead only, reason required on reject', () =
     });
     expect(res.status).toBe(200);
     expect(res.body.data.nomination.leadDecision.action).toBe('reject');
+    expect(res.body.data.status).toBe('talent-approved'); // pick returned
   });
 
   it('lead cannot reject without a reason', async () => {
@@ -141,18 +180,31 @@ describe('nominee approve/reject — lead only, reason required on reject', () =
 
   it('talent cannot decide on nominees', async () => {
     const card = await nominatedCard();
-    const res = await agents.talentA.post(`/api/cards/${card._id}/nominee-decision`).send({ action: 'approve' });
+    const res = await agents.talentA.post(`/api/cards/${card._id}/nominee-decision`).send({
+      action: 'approve',
+      approvedNomineeId: ctx.users.reviewer._id.toString(),
+    });
     expect(res.status).toBe(403);
   });
 
-  it('there is no substitution parameter — a lead-sent nominee list is ignored by the decision route', async () => {
+  it('approval must select one of the TALENT\'S nominees — substitution is rejected (Invariant 4)', async () => {
     const card = await nominatedCard();
     const res = await agents.lead.post(`/api/cards/${card._id}/nominee-decision`).send({
       action: 'approve',
-      nominees: [{ userId: ctx.users.lead._id.toString(), name: 'Substituted', role: 'peer' }],
+      approvedNomineeId: ctx.users.talentB._id.toString(), // not a nominee
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('approval of a real nominee routes the card to them (FR-16)', async () => {
+    const card = await nominatedCard();
+    const res = await agents.lead.post(`/api/cards/${card._id}/nominee-decision`).send({
+      action: 'approve',
+      approvedNomineeId: ctx.users.reviewer._id.toString(),
     });
     expect(res.status).toBe(200);
-    expect(res.body.data.nomination.nominees[0].name).toBe('Reviewer'); // untouched
+    expect(res.body.data.status).toBe('routed');
+    expect(res.body.data.nomination.routedTo).toBe(ctx.users.reviewer._id.toString());
   });
 });
 

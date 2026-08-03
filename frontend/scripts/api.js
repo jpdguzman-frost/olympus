@@ -19,6 +19,7 @@ async function api(method, url, body) {
   if (!json.ok) {
     const err = new Error(json.error || 'Request failed');
     err.status = res.status;
+    if (json.failures) err.failures = json.failures;
     throw err;
   }
   return json.data;

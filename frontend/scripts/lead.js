@@ -11,9 +11,38 @@ const app = new Ractive({
     notice: null,
     reports: [],
     cards: [],
+    queue: [],
     shellReportId: '',
     shellSubject: '',
     shellCloseDate: '',
+  },
+
+  async approveNominee(card, nominee) {
+    this.set({ error: null, notice: null });
+    try {
+      await api('POST', `/api/cards/${card._id}/nominee-decision`, {
+        action: 'approve',
+        approvedNomineeId: nominee.userId,
+      });
+      this.set('notice', `Routed “${card.subject.name}” to ${nominee.name}.`);
+      await refreshQueue();
+    } catch (err) {
+      this.set('error', err.message);
+    }
+  },
+
+  async rejectNominee(card) {
+    this.set({ error: null, notice: null });
+    try {
+      await api('POST', `/api/cards/${card._id}/nominee-decision`, {
+        action: 'reject',
+        reason: card.rejectReason,
+      });
+      this.set('notice', `Returned the pick on “${card.subject.name}” to the talent.`);
+      await refreshQueue();
+    } catch (err) {
+      this.set('error', err.message);
+    }
   },
 
   async logout() {
@@ -40,6 +69,10 @@ const app = new Ractive({
   },
 });
 
+async function refreshQueue() {
+  app.set('queue', await api('GET', '/api/team/nominee-queue'));
+}
+
 (async function boot() {
   try {
     const me = await api('GET', '/api/me');
@@ -52,11 +85,12 @@ const app = new Ractive({
       isTalent: me.roles.includes('talent'),
       isAdmin: me.roles.includes('admin'),
     });
-    const [reports, cards] = await Promise.all([
+    const [reports, cards, queue] = await Promise.all([
       api('GET', '/api/team/reports'),
       api('GET', '/api/team/cards'),
+      api('GET', '/api/team/nominee-queue'),
     ]);
-    app.set({ reports, cards });
+    app.set({ reports, cards, queue });
   } catch (err) {
     app.set('error', err.message);
   }

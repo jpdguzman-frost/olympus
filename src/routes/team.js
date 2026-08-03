@@ -4,9 +4,19 @@ import { Router } from 'express';
 import { requireRole } from '../middleware/auth.js';
 import { User } from '../models/User.js';
 import * as cards from '../services/cardService.js';
+import { leadNomineeQueue } from '../services/confirmService.js';
 import { sendSuccess } from '../utils/responseEnvelope.js';
 
 const router = Router();
+
+// FR-14/FR-17: cards awaiting this lead's nominee decision, with repeat streaks
+router.get('/api/team/nominee-queue', requireRole('lead'), async (req, res, next) => {
+  try {
+    sendSuccess(res, await leadNomineeQueue(req.currentUser));
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/api/team/reports', requireRole('lead'), async (req, res, next) => {
   try {

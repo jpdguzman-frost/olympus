@@ -45,12 +45,8 @@ export async function makeTestContext() {
   return { app, loginAs, teardown, users: { lead, otherLead, talentA, talentB, reviewer, admin } };
 }
 
-/**
- * Drive a draft card (with one claim) through the status machine to
- * `routed`, assigned to `reviewer` — the fixture for verdict tests.
- * Uses the same server-side transition path production uses.
- */
-export async function routeCardTo(cardId, reviewerId, actorId) {
+/** Fixture: draft → structured with one claim (server-side transition path). */
+export async function structureFixture(cardId, actorId) {
   const card = await Card.findById(cardId);
   card.claims.push({
     type: 'competency',
@@ -59,7 +55,30 @@ export async function routeCardTo(cardId, reviewerId, actorId) {
     flags: [],
   });
   await transition(card, 'structured', actorId);
-  await transition(card, 'talent-approved', actorId);
+  await card.save();
+  return card;
+}
+
+/** Fixture: structured → talent-approved (all claims approved). */
+export async function talentApproveFixture(cardId, actorId) {
+  const card = await Card.findById(cardId);
+  if (card.status === 'draft') await structureFixture(cardId, actorId);
+  const fresh = await Card.findById(cardId);
+  for (const claim of fresh.claims) claim.talentApproved = true;
+  await transition(fresh, 'talent-approved', actorId);
+  await fresh.save();
+  return fresh;
+}
+
+/**
+ * Drive a draft card (with one claim) through the status machine to
+ * `routed`, assigned to `reviewer` — the fixture for verdict tests.
+ * Uses the same server-side transition path production uses.
+ */
+export async function routeCardTo(cardId, reviewerId, actorId) {
+  await talentApproveFixture(cardId, actorId);
+  const card = await Card.findById(cardId);
+  card.nomination.nominees = [{ userId: reviewerId, name: 'Fixture Reviewer', role: 'confirmer' }];
   await transition(card, 'lead-nominee-review', actorId);
   await transition(card, 'routed', actorId);
   card.nomination.routedTo = reviewerId;
