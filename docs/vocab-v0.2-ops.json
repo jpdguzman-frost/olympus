@@ -1,0 +1,39 @@
+{
+  "competencyOrDomainList": [
+    "Pipeline & Board Management",
+    "Request intake & filing",
+    "Revision tracking",
+    "Status & blockers",
+    "Workflow & file management",
+    "Meeting facilitation",
+    "Cross-functional coordination",
+    "Reliability",
+    "Operational resiliency",
+    "Operational awareness",
+    "Tool & automation development",
+    "Platform & account administration",
+    "Resource management",
+    "Budget & tools forecasting",
+    "Team onboarding",
+    "Process design & improvement"
+  ],
+  "controlledVocabulary": {
+    "execution": [
+      "My work is being checked by someone else",
+      "I fully own the work — no one checks behind me",
+      "I own the work but delegates it to someone else"
+    ],
+    "decision": [
+      "I executed the decision given to me",
+      "I proposed and someone decided",
+      "I made the decision, but someone above me could overturn it",
+      "The decision is fully rest on me and no one else"
+    ],
+    "scope": [
+      "Own work",
+      "Own account",
+      "Others' work",
+      "Across tracks"
+    ]
+  }
+}

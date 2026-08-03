@@ -1,0 +1,77 @@
+{
+  "competencyOrDomainList": [
+    "Seed",
+    "Sketch",
+    "Cascade",
+    "Render",
+    "Review",
+    "Direction Setting",
+    "Animation",
+    "Tool & automation development",
+    "Platform & account administration",
+    "Resource management",
+    "Budget & tools forecasting",
+    "Team onboarding",
+    "Process design & improvement"
+  ],
+  "controlledVocabulary": {
+    "floor": [
+      "No. Someone refines my work before it goes out.",
+      "Yes. My work goes out as is, but someone can overturn, rework or refine it.",
+      "Yes. My work goes out as is.",
+      "Yes. And I refine other people's work."
+    ],
+    "direction": [
+      "I followed an existing direction.",
+      "I expanded an existing direction.",
+      "I set the direction for this work, from an existing system and style.",
+      "I created the direction. It was not used.",
+      "I created the direction. It was used, but someone refined it to get it out.",
+      "I created the direction. Everyone followed it.",
+      "Someone else created the direction. I steered and refined them. Theirs was used."
+    ],
+    "review": [
+      "Peer review. I spot issues. Someone else decides what ships.",
+      "Design review, but only when the usual reviewer is out.",
+      "Design review. What I pass, goes out."
+    ],
+    "shaped": [
+      "Already existed.",
+      "Me.",
+      "Me, and I delegated parts to others.",
+      "Me, but with guidance from someone senior.",
+      "Me and delegated parts to others, with guidance from someone senior.",
+      "Someone else.",
+      "Someone else, under my guidance."
+    ],
+    "decided": [
+      "Already existed — the call was made before this project.",
+      "Me.",
+      "Me, but with guidance from someone senior.",
+      "Someone else.",
+      "Someone else, under my guidance."
+    ],
+    "carried": [
+      "Someone else.",
+      "Someone else, under my guidance.",
+      "Me, but with guidance from someone senior.",
+      "Me, and I delegated parts to others.",
+      "Me, alone. Nobody came back in."
+    ],
+    "directionExisted": [
+      "Yes",
+      "No"
+    ],
+    "execution": [
+      "My work is being checked by someone else",
+      "I fully own the work — no one checks behind me",
+      "I own the work but delegates it to someone else"
+    ],
+    "decision": [
+      "I executed the decision given to me",
+      "I proposed and someone decided",
+      "I made the decision, but someone above me could overturn it",
+      "The decision is fully rest on me and no one else"
+    ]
+  }
+}
