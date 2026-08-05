@@ -154,6 +154,48 @@ describe('the conversation engine', () => {
     expect(client.calls).toBe(0); // the cap answered, not the API
   });
 
+  it('a second message while the reply is pending is refused — no double turns (JP bug, Aug 5)', async () => {
+    const card = await conversationCard('Double Send Card');
+    const client = makeClient([Q('What is this work?')]);
+    await converse(talentUser, card._id, { client });
+
+    // Simulate the race: the talent turn saved, the AI reply not yet.
+    const stored = await Card.findById(card._id);
+    stored.conversation.push({ role: 'talent', kind: 'answer', text: 'Yes! I handle this project.' });
+    await stored.save();
+
+    await expect(
+      converse(talentUser, card._id, { text: 'Yes! I handle this project.', client }),
+    ).rejects.toThrow(/still on your last message/);
+    const after = await Card.findById(card._id);
+    expect(after.conversation.filter((t) => t.text === 'Yes! I handle this project.')).toHaveLength(1);
+  });
+
+  it('after the wrap, the talent can still add and fix — the conversation reopens (JP, Aug 5)', async () => {
+    const card = await conversationCard('Post Wrap Card');
+    const client = makeClient([
+      Q('What is this work?'),
+      Q('Anything else you own here?', 'sweep'),
+      Q('That is everything I need — send it in, or add anything by typing.', 'wrap', true),
+      Q('Got it — noted that Denise made the final call there. Anything else to fix?'),
+      Q('All set again — send it in when ready.', 'wrap', true),
+    ]);
+
+    await converse(talentUser, card._id, { client });
+    await converse(talentUser, card._id, { text: 'I run the board since Jan, nobody checks.', client });
+    const wrapped = await converse(talentUser, card._id, { text: 'Wala na.', client });
+    expect(wrapped.turn.done).toBe(true);
+
+    // The talent refines a nuance AFTER the wrap — it lands and the AI takes it in.
+    const addition = await converse(talentUser, card._id, {
+      text: 'Actually one fix: the final call on priorities was Denise, not me.',
+      client,
+    });
+    expect(addition.turn.done).toBe(false);
+    const stored = await Card.findById(card._id);
+    expect(stored.rawAnswers.some((a) => a.answer.includes('Denise'))).toBe(true); // saved verbatim, will feed structuring
+  });
+
   it('nobody but the talent converses on their card', async () => {
     const card = await conversationCard('Private Chat');
     const admin = await ctx.loginAs(ctx.users.admin);

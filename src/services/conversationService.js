@@ -104,7 +104,10 @@ function renderConversationInput(card, capsScaffold, summary, aiQuestionsUsed) {
     'what else they own here that has not come up — remind them "not me" costs nothing, and that a',
     'yes needs one detail (what, where, since when). After their sweep answer (with one detail invite',
     'if they said yes to something bare), kind="wrap": tell them plainly you have what you need and',
-    'they can send it in. Set done=true only on the wrap.',
+    'they can send it in — and that they can still add or fix anything by just typing. Set done=true',
+    'only on a wrap.',
+    'If the talent adds, corrects, or refines something AFTER a wrap: take it in, ask at most what is',
+    'needed to place it, then wrap again briefly. Their latest words always win over earlier ones.',
     'VOICE: English. Approachable yet professional. Simple words. No hype. Neutral.',
     'Output only the schema.',
   );
@@ -159,8 +162,15 @@ export async function converse(actor, cardId, { text = null, client = null } = {
   }
 
   const lastAi = [...card.conversation].reverse().find((t) => t.role === 'ai');
+  const lastTurn = card.conversation[card.conversation.length - 1];
 
   if (text?.trim()) {
+    // Double-send guard: while a reply is still being written (the last
+    // turn is the talent's, unanswered), a second message would store
+    // twice. One in-flight message at a time.
+    if (lastTurn?.role === 'talent') {
+      throw conflict("One moment — I'm still on your last message. It's saved; the reply is coming.");
+    }
     const clean = String(text).trim();
     // Invariant 15: the talent's words persist BEFORE any AI call.
     card.conversation.push({ role: 'talent', kind: 'answer', text: clean });

@@ -415,7 +415,8 @@ async function loadCapture(cardId) {
         .then((sum) => app.set('summaryText', sum ? sum.text : null))
         .catch(() => {});
     }
-    if (!(card.conversation || []).length) app.sendChat('');
+    const convo = card.conversation || [];
+    if (!convo.length || convo[convo.length - 1].role === 'talent') app.sendChat('');
     return;
   }
 
