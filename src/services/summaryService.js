@@ -16,7 +16,8 @@ import mongoose from 'mongoose';
 import Anthropic from '@anthropic-ai/sdk';
 import { taskScaffold, currentBatch } from './capsService.js';
 
-const MODEL = process.env.STRUCTURER_MODEL || 'claude-opus-5';
+// JP (Aug 5): summaries/categorization run on Sonnet 5; structuring stays on Opus.
+const MODEL = process.env.CONVERSATION_MODEL || 'claude-sonnet-5';
 
 const capsSummarySchema = new mongoose.Schema(
   {

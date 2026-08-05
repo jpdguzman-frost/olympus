@@ -31,7 +31,8 @@ import { taskScaffold } from './capsService.js';
 import { badRequest, forbidden, notFound, conflict } from '../utils/httpError.js';
 import { pushCardAudit } from './auditService.js';
 
-const MODEL = process.env.STRUCTURER_MODEL || 'claude-opus-5';
+// JP (Aug 5): the interaction runs on Sonnet 5; structuring stays on Opus.
+const MODEL = process.env.CONVERSATION_MODEL || 'claude-sonnet-5';
 export const MAX_AI_QUESTIONS = 12; // hard cap — latitude, never a target
 
 export const SKELETON_TOPICS = [
