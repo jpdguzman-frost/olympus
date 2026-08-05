@@ -145,31 +145,51 @@ Touches: `Card`, `structurerService` (re-map mode),
 `cardService`/`confirmService`, new archive worker, talent frontend,
 capture/structurer/confirmFlow tests. Est. 4d.
 
-## B5 — CAPS integration (A2; highest external unknown)
+## B5 — CAPS integration (A2; REVISED Aug 5 per JP: CSV side build)
 
-**Blocked on: CAPS/Raintool API access — endpoint, auth, and data
-shape from JP.**
+Source of record for now: JP's cleaned CSV extract from the
+`../caps-analysis` project (H1 2026 window, Jan 5 – Jul 10, ~26k
+task×contributor rows; 2024–2025 backfill later "once the model
+works"). The upstream Redis datastore CAPS pulls from is a future
+adapter behind the same `capsService` interface — nothing else in the
+app knows or cares which source fed it. Unblocked; no external access
+needed.
 
-1. **Read-only CAPS client** with a whitelist ingestion boundary:
-   task names, task categories, project assignments, reviewer
-   identities, leadership weeks, task dates. Nothing else ever
-   enters the app — value scores, pace, peer bands, volume stats are
-   dropped at the boundary, not filtered later.
-2. **Hard-wall test class** (Invariant-18-to-be): asserts no
-   forbidden CAPS field appears in any API payload, prompt, stored
-   card, or view model. Review count never treated as review
-   authority.
-3. **Exposure auto-verify** switches on: nominee's logged reviews of
-   the talent's work span 3+ separate weeks on that project
-   (threshold a config value, tunable post-pilot) → skips sign-off;
-   below threshold/no record → B3's sign-off path. 
-4. **CAPS date prompts** in capture ("CAPS shows you on this project
-   from September — does that match?").
-5. No CAPS data → everything degrades to the B6 fallback; CAPS is an
-   accelerator, never a gate.
+1. **Whitelist-only import** (`npm run import-caps -- <csvFile>`),
+   versioned batches. Only these fields ever enter the app, per A2:
+   task name, category, project name, contributor name, the
+   name-valued reviewer columns (Peer/Design/Content/Dev/Code/Ops
+   Review, Content Checks, QA Validation, Design QA), date, ISO
+   week. Leadership weeks import from the credit-detail CSV
+   (person, project, weeks_led only). EVERYTHING else in the files
+   is dropped at the boundary — Task/Contribution Weight, Final
+   Score, Difficulty, the numeric review-score columns,
+   Full/Major/Partial credit, Accepted/Discarded, roster
+   rung/mode/total. Whitelist ingestion, not blocklist: unnamed
+   columns never persist.
+2. **Identity join**: CAPS speaks names, not emails. Users get an
+   admin-editable `capsName`; the import applies the canonical alias
+   rules (Roni→August, Yelle→Erielle). Unmapped names simply don't
+   join — no guessing.
+3. **Hard-wall test class** (Invariant-18-to-be): import a fixture
+   CSV carrying banned columns → assert stored documents hold only
+   whitelisted keys, and no API payload, prompt, or view model ever
+   contains a weight, score, difficulty, band, or total. Review
+   count never treated as review authority.
+4. **Exposure auto-verify** switches on: nominee's name appears in a
+   reviewer column on the talent's rows for that project across 3+
+   distinct weeks (threshold config, tunable post-pilot) → skips
+   sign-off; below/no record → B3's sign-off path.
+5. **CAPS date prompts** in capture from min/max task dates per
+   (contributor, project); catch-up door lists the talent's CAPS
+   projects with no card.
+6. Stale or absent extract → everything degrades to the fallback;
+   CAPS is an accelerator, never a gate (extract freshness is
+   whatever JP last imported — shown on the admin page).
 
-Touches: new `capsService` + sync worker, `confirmService` exposure
-check, capture, new test class. Est. 3d after access.
+Touches: new `capsService` + import script + mirror collection,
+User.capsName + admin UI, `confirmService` exposure check, capture,
+new test class. Est. 3d.
 
 ## B6 — Two-door capture (A3; biggest UX reshape, depends on B5)
 
