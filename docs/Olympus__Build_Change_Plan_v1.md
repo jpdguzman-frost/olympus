@@ -160,13 +160,19 @@ needed.
    task name, category, project name, contributor name, the
    name-valued reviewer columns (Peer/Design/Content/Dev/Code/Ops
    Review, Content Checks, QA Validation, Design QA), date, ISO
-   week. Leadership weeks import from the credit-detail CSV
-   (person, project, weeks_led only). EVERYTHING else in the files
-   is dropped at the boundary — Task/Contribution Weight, Final
-   Score, Difficulty, the numeric review-score columns,
-   Full/Major/Partial credit, Accepted/Discarded, roster
-   rung/mode/total. Whitelist ingestion, not blocklist: unnamed
-   columns never persist.
+   week. **Leadership weeks: ON HOLD (JP, Aug 5 — "finicky"); the
+   credit-detail CSV is not imported.** In its place, **project
+   tenure**: first → last task date per (contributor, project),
+   derived from the already-whitelisted dates, nothing extra
+   ingested. EVERYTHING else in the files is dropped at the
+   boundary — Task/Contribution Weight, Final Score, Difficulty,
+   the numeric review-score columns, Full/Major/Partial credit,
+   Accepted/Discarded, roster rung/mode/total. Whitelist ingestion,
+   not blocklist: unnamed columns never persist.
+   Consequence while the hold stands: Intent v2's upward-signal
+   duty runs on review authority (reviewer columns) only —
+   leadership weeks stop being a surfaced signal until JP lifts
+   the hold.
 2. **Identity join**: CAPS speaks names, not emails. Users get an
    admin-editable `capsName`; the import applies the canonical alias
    rules (Roni→August, Yelle→Erielle). Unmapped names simply don't
