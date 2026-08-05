@@ -161,11 +161,22 @@ function renderCardInput(card, capsScaffold = null) {
   if (card.captureMode === 'conversation' && card.conversation?.length) {
     // B7: the capture ran as a conversation. Only TALENT turns are
     // evidence — the FR-10 verbatim check reads rawAnswers, which holds
-    // exactly the talent's words.
-    parts.push('', 'CAPTURE CONVERSATION (only the TALENT lines are evidence; quotes must come from them):');
+    // exactly the talent's words. The interview transcript is context;
+    // the QUOTABLE WORDS list below makes verbatim quoting mechanical.
+    parts.push(
+      '',
+      'THE FINISHED CAPTURE INTERVIEW (context — the INTERVIEWER lines were the capture assistant, not the talent):',
+    );
     for (const turn of card.conversation) {
-      parts.push(`${turn.role === 'ai' ? 'ASSISTANT' : 'TALENT'}: ${turn.text}`);
+      parts.push(`${turn.role === 'ai' ? 'INTERVIEWER' : 'TALENT'}: ${turn.text}`);
     }
+    parts.push(
+      '',
+      "THE TALENT'S WORDS — the ONLY text you may quote from. Every sourceQuote must be an exact,",
+      'character-for-character substring of one of these lines:',
+      ...card.rawAnswers.map((a) => `- ${a.answer}`),
+      ...card.sweepAnswers.map((s) => `- ${s.answer}`),
+    );
   } else {
     const answers = card.rawAnswers
       .map((a) =>
@@ -200,9 +211,10 @@ function renderCardInput(card, capsScaffold = null) {
   // section in the spec at GATE-1.
   parts.push(
     '',
-    'THE TASK, NOW: you are the structuring step of the pipeline your rules describe.',
-    'This is a FILED card, not a live chat — the talent is not present to answer you here.',
-    'The capture already happened: the questions above WERE asked and answered (as a form or a conversation).',
+    'THE TASK, NOW: you are the STRUCTURING step of the pipeline your rules describe.',
+    'This is a FILED card, not a live chat — the talent is not present, and the interview (if one',
+    'appears above) is FINISHED; the interviewer was the capture assistant, and its job is done.',
+    'Do not continue the conversation. Do not wait. Structure what the talent said, now.',
     'If no CAPS scaffold appears above, that only means no scaffold exists — the answers are still the complete input. Structure them.',
     'In one pass, apply your rules to the raw answers above:',
     '- Draft EVERY claim their words support, each at the lowest plausible reading, controlled vocabulary only.',
@@ -211,6 +223,12 @@ function renderCardInput(card, capsScaffold = null) {
     '- Note upward signals they did not claim (signalsNoted), each with its exact verbatim quote.',
     '- followUps: the anchor/clarifier questions you would ask, within your question budget — they will be relayed to the talent.',
     'Output only the schema. Never a level, never a score.',
+    'NEVER output a placeholder row: a claim with empty labels or an empty sourceQuote is forbidden.',
+    'Thin or undated words are NOT a reason to go empty — draft the claim at the lowest reading the',
+    'words support, quote the exact words, and flag it ("insufficient detail — draft"). Only words',
+    'that map to no competency at all produce no claim; if truly nothing maps, return claims: [].',
+    'Some talent lines are conversation management, not evidence — "this is good enough", "ok",',
+    '"wrap it up", "that\'s everything". Skip them for claims; they never block or change the rest.',
   );
   return parts.join('\n');
 }
