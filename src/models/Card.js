@@ -142,7 +142,19 @@ const cardSchema = new Schema(
     filedDate: { type: Date, default: null },
     periodTag: { type: String, default: null }, // quarter of closeDate, Asia/Manila (FR-4)
     status: { type: String, enum: CARD_STATUSES, default: 'draft', index: true },
-    captureMode: { type: String, enum: ['guided', 'single-pass', null], default: null },
+    captureMode: { type: String, enum: ['guided', 'single-pass', 'conversation', null], default: null },
+    // B7: the capture conversation. Talent turns ALSO persist into
+    // rawAnswers verbatim the moment they are sent (Invariant 15) —
+    // which is what makes quotes talent-only: the FR-10 verbatim check
+    // reads rawAnswers, and AI turns never enter it.
+    conversation: [
+      {
+        role: { type: String, enum: ['ai', 'talent'], required: true },
+        kind: { type: String, enum: ['question', 'sweep', 'wrap', 'answer'], default: null },
+        text: { type: String, required: true },
+        at: { type: Date, default: Date.now },
+      },
+    ],
     rawAnswers: [
       {
         questionIndex: Number,

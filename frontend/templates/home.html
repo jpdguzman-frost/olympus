@@ -33,76 +33,28 @@
     <h1>{{me.name.split(' ')[0]}}'s record</h1>
     <span class="topbar-spacer"></span>
     {{#if isTalent}}
-      <button class="btn btn-primary" on-click="@this.startCard()">File a project</button>
-      <button class="btn btn-secondary" on-click="@this.openCatchUp()">Catch up</button>
+      <button class="btn btn-secondary" on-click="@this.startCard()">File something else</button>
     {{/if}}
   </div>
 
-  {{#if catchUpVisible}}
+  {{#if isTalent && myProjects.length}}
     <section>
-      <div class="section-label">Catch up — projects with no card yet</div>
-      <div class="shell-form">
-        <p class="muted" style="font-size: var(--text-sm); margin-bottom: 0.75rem;">
-          These are your projects from CAPS that have no card. Pick one — it opens the same card flow.
-        </p>
-        <div class="form-row">
-          <label class="field">
-            <span class="field-name">From</span>
-            <input type="date" value="{{catchUpFrom}}" />
-          </label>
-          <label class="field">
-            <span class="field-name">To</span>
-            <input type="date" value="{{catchUpTo}}" />
-          </label>
-          <button class="btn btn-secondary" style="align-self: flex-end;" on-click="@this.loadCatchUp()">Look</button>
-        </div>
-        {{#if catchUpProjects.length}}
-          {{#each catchUpProjects}}
-            <div class="record-meta" style="padding: 0.5rem 0; border-top: 1px solid var(--rule); align-items: center;">
-              <strong style="color: var(--ink); font-family: var(--sans);">{{.projectName}}</strong>
-              {{#if .tenure}}<span>you were on it {{fmtDate(.tenure.from)}} – {{fmtDate(.tenure.to)}}</span>{{/if}}
-              <span class="spacer"></span>
-              <button class="btn btn-primary" on-click="@this.fileCatchUp(this)">File this one</button>
-            </div>
-          {{/each}}
-        {{elseif catchUpLoaded}}
-          <div class="empty-state">Nothing to catch up on in this range — every project has a card, or CAPS has no rows for you.</div>
-        {{/if}}
-      </div>
-    </section>
-  {{/if}}
-
-  {{#if isTalent}}
-    <section>
-      <div class="section-label">Ladder</div>
-      {{#if ladder && ladder.level}}
-        <div class="record" style="border-left: 3px solid var(--carbon);">
+      <div class="section-label">Your projects — no card yet</div>
+      {{#each myProjects}}
+        <article class="record">
           <div class="record-head">
-            <span class="record-subject" style="font-size: var(--text-display);">{{ladder.level}}{{#if ladder.texture}} · {{ladder.texture}}{{/if}}</span>
+            <span class="record-subject">{{.projectName}}</span>
           </div>
           <div class="record-meta">
-            <span class="tag">floor: {{ladder.floor}}</span>
-            <span>{{ladder.confirmedClaims}} confirmed claims on record</span>
+            {{#if .tenure}}<span>you were on it {{fmtDate(.tenure.from)}} – {{fmtDate(.tenure.to)}}</span>{{/if}}
           </div>
-          {{#if ladder.basis}}
-            <p class="muted" style="font-size: var(--text-sm); margin-top: 0.5rem;">
-              Read from {{ladder.basis.competency}}{{#if ladder.basis.subject}} on {{ladder.basis.subject}}{{/if}}:
-            </p>
-            <p class="verbatim">“{{ladder.basis.quote}}”</p>
-          {{/if}}
-          {{#if ladder.honestGap}}
-            <p class="muted" style="font-size: var(--text-sm); margin-top: 0.75rem;"><strong>Your honest gap, in your words:</strong> {{ladder.honestGap}}</p>
-          {{/if}}
-          {{#each ladder.notes}}
-            <p class="muted" style="font-size: var(--text-xs); color: var(--amber-ink); margin-top: 0.3rem;">{{this}}</p>
-          {{/each}}
-        </div>
-      {{else}}
-        <div class="ladder-pending">
-          <span class="meta">READ FROM YOUR CONFIRMED CARDS — NO ONE SETS THIS BY HAND</span>
-          Nothing here yet. When your first card is confirmed, your level shows up here.
-        </div>
-      {{/if}}
+          <div class="record-foot">
+            <span class="muted" style="font-size: var(--text-sm);">File it — a short conversation, your words, a few minutes.</span>
+            <span class="spacer"></span>
+            <button class="btn btn-primary" on-click="@this.fileProject(this)">File this project</button>
+          </div>
+        </article>
+      {{/each}}
     </section>
   {{/if}}
 

@@ -18,12 +18,12 @@ const app = new Ractive({
     home: { confirmed: [], drafts: [], archived: [], inFlight: [], track: null },
     queue: [],
     signoffs: [],
-    catchUpVisible: false,
-    catchUpFrom: '',
-    catchUpTo: '',
-    catchUpProjects: [],
-    catchUpLoaded: false,
+    myProjects: [],
     capsContext: null,
+    summaryText: null,
+    chatInput: '',
+    chatBusy: false,
+    chatDone: false,
     ladder: null,
     quarters: {},
     quarterTags: [],
@@ -69,46 +69,47 @@ const app = new Ractive({
   },
 
   async startCard() {
-    const card = await api('POST', '/api/cards', {});
+    const card = await api('POST', '/api/cards', { captureMode: 'conversation' });
     window.location.hash = `#/card/${card._id}`;
   },
 
-  // Door 2 (A3): a date-range entry screen — navigation, never a capture mode.
-  async openCatchUp() {
-    const now = new Date();
-    const from = new Date(now.getTime() - 183 * 24 * 60 * 60 * 1000);
-    this.set({
-      catchUpVisible: !this.get('catchUpVisible'),
-      catchUpFrom: from.toISOString().slice(0, 10),
-      catchUpTo: now.toISOString().slice(0, 10),
-    });
-    if (this.get('catchUpVisible')) await this.loadCatchUp();
-  },
-
-  async loadCatchUp() {
-    this.set({ error: null });
-    try {
-      const projects = await api(
-        'GET',
-        `/api/caps/catch-up?from=${this.get('catchUpFrom')}&to=${this.get('catchUpTo')}`,
-      );
-      this.set({ catchUpProjects: projects, catchUpLoaded: true });
-    } catch (err) {
-      this.set('error', err.message);
-    }
-  },
-
-  async fileCatchUp(project) {
+  // B7: file a project straight from the home list.
+  async fileProject(project) {
     this.set({ error: null });
     try {
       const card = await api('POST', '/api/cards', {
         subjectName: project.projectName,
         closeDate: project.tenure?.to ? String(project.tenure.to).slice(0, 10) : null,
+        captureMode: 'conversation',
       });
       window.location.hash = `#/card/${card._id}`;
     } catch (err) {
       this.set('error', err.message);
     }
+  },
+
+  // B7: one talent turn in the capture conversation.
+  async sendChat(forcedText = null) {
+    const text = forcedText ?? this.get('chatInput');
+    if (this.get('chatBusy')) return;
+    this.set({ chatBusy: true, actionError: null });
+    try {
+      const result = await api('POST', `/api/cards/${this.get('card._id')}/converse`, { text });
+      this.set({
+        'card.conversation': result.conversation,
+        chatInput: '',
+        chatDone: Boolean(result.turn?.done),
+        canSubmit: Boolean(result.canSubmit),
+      });
+    } catch (err) {
+      this.set('actionError', err.message);
+    } finally {
+      this.set('chatBusy', false);
+    }
+  },
+
+  async wrapChat() {
+    await this.sendChat("That's everything from me — let's wrap up.");
   },
 
   openCard(id) {
@@ -360,12 +361,13 @@ async function route() {
 }
 
 async function loadHome() {
-  const [home, queue, signoffs] = await Promise.all([
+  const [home, queue, signoffs, myProjects] = await Promise.all([
     api('GET', '/api/home'),
     api('GET', '/api/queue'),
     api('GET', '/api/signoffs'),
+    api('GET', '/api/caps/catch-up').catch(() => []),
   ]);
-  app.set({ home, queue, signoffs, view: 'home' });
+  app.set({ home, queue, signoffs, myProjects, view: 'home' });
   if (app.get('isTalent')) {
     const [ladder, quarters] = await Promise.all([api('GET', '/api/ladder'), api('GET', '/api/quarters')]);
     app.set({ ladder, quarters, quarterTags: Object.keys(quarters).sort().reverse() });
@@ -395,6 +397,28 @@ async function loadCapture(cardId) {
     return;
   }
   const track = home.track || { questionSet: [], competencyOrDomainList: [] };
+
+  if (card.captureMode === 'conversation') {
+    app.set({
+      view: 'capture',
+      card,
+      track,
+      summaryText: null,
+      chatInput: '',
+      chatBusy: false,
+      chatDone: false,
+      canSubmit: (card.sweepAnswers || []).length > 0,
+      saveState: 'idle',
+    });
+    if (card.subject.name) {
+      api('GET', `/api/caps/summary?project=${encodeURIComponent(card.subject.name)}`)
+        .then((sum) => app.set('summaryText', sum ? sum.text : null))
+        .catch(() => {});
+    }
+    if (!(card.conversation || []).length) app.sendChat('');
+    return;
+  }
+
   const answers = ['', '', '', ''];
   let singleText = '';
   for (const a of card.rawAnswers || []) {

@@ -270,3 +270,12 @@ versioned data, never hard-coded. All Aug 3 tests that encode
 superseded flows (lead approval) are rewritten, not deleted —
 coverage may not drop. Estimates: B1 2d · B2 3d · B3 3d · B4 4d ·
 B5 3d · B6 4d ≈ 19 dev-days [likely].
+
+## B7 — Conversational capture (JP spec, Aug 5) — **DONE Aug 5**
+
+See Olympus__B7_Conversational_Capture_Spec.md. Supersedes C7. Home
+project list replaces the doors; AI activity summary (cached, no
+volume stats); one-question-at-a-time Socratic capture, early wrap,
+12-question cap; talent turns persist verbatim pre-AI-call; AI turns
+can never be quoted (structural); behavior addendum drafted for JP
+(Olympus__M0_Intent_v2.1_Conversation_DRAFT.md), unpublished.

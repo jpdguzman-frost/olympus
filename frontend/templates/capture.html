@@ -8,6 +8,51 @@
     </span>
   </div>
 
+  {{#if card.captureMode === 'conversation'}}
+    {{#if summaryText}}
+      <div class="context-strip">
+        <div class="context-title">What you did here, from CAPS — memory only, never evidence</div>
+        <p style="white-space: pre-line; font-size: var(--text-sm); margin: 0.25rem 0;">{{summaryText}}</p>
+        <div class="note">Only what you say below counts.</div>
+      </div>
+    {{/if}}
+
+    <section>
+      <div class="section-label">The conversation</div>
+      {{#each card.conversation}}
+        <div class="question-block" style="{{#if .role === 'talent'}}border-left: 3px solid var(--carbon); margin-left: 2rem;{{/if}}">
+          <span class="question-number">{{#if .role === 'ai'}}OLYMPUS{{else}}YOU{{/if}}</span>
+          <p class="{{#if .role === 'talent'}}verbatim{{else}}question-text{{/if}}" style="white-space: pre-line;">{{.text}}</p>
+        </div>
+      {{/each}}
+      {{#if chatBusy}}
+        <p class="loading">thinking…</p>
+      {{/if}}
+      {{#if !chatDone}}
+        <div class="sweep-actions" style="flex-wrap: wrap; margin-top: 0.75rem;">
+          <textarea value="{{chatInput}}" placeholder="In your own words…" style="flex: 2; min-height: 5rem;" disabled="{{chatBusy}}"></textarea>
+        </div>
+        <div class="sweep-actions" style="margin-top: 0.4rem;">
+          <button class="btn btn-primary" on-click="@this.sendChat()" disabled="{{chatBusy || !chatInput.trim()}}">Send</button>
+          <span class="spacer"></span>
+          {{#if card.rawAnswers.length}}
+            <button class="btn btn-quiet" on-click="@this.wrapChat()" disabled="{{chatBusy}}">That's everything — wrap up</button>
+          {{/if}}
+        </div>
+      {{/if}}
+    </section>
+
+    {{#if submitMessage}}<div class="banner banner-safe">{{submitMessage}}</div>{{/if}}
+    {{#if submitError}}<div class="banner banner-warn">{{submitError}}</div>{{/if}}
+
+    <div class="submit-bar">
+      <span class="muted" style="font-size: var(--text-sm);">
+        Every word you send is saved as you go. When you send it in, the app turns your words into lines for you to check.
+      </span>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" on-click="@this.submitCard()" disabled="{{!canSubmit}}">Send it in</button>
+    </div>
+  {{else}}
   {{#if card.createdViaShellBy}}
     <p class="capture-shell-note">
       Your lead started this card with just the name and the date. Everything else is yours to write.
@@ -122,4 +167,5 @@
     <span class="spacer"></span>
     <button class="btn btn-primary" on-click="@this.submitCard()" disabled="{{!canSubmit}}">Send it in</button>
   </div>
+  {{/if}}
 </script>

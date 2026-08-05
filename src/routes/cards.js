@@ -214,6 +214,28 @@ router.get('/api/caps/catch-up', async (req, res, next) => {
   }
 });
 
+// B7: the activity summary for a project — memory, never evidence
+router.get('/api/caps/summary', async (req, res, next) => {
+  try {
+    const { cachedSummary } = await import('../services/summaryService.js');
+    const summary = await cachedSummary(req.currentUser, req.query.project);
+    sendSuccess(res, summary ? { text: summary.text } : null);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// B7: the capture conversation — one question at a time
+router.post('/api/cards/:id/converse', async (req, res, next) => {
+  try {
+    const { converse } = await import('../services/conversationService.js');
+    const { card, turn } = await converse(req.currentUser, req.params.id, { text: req.body?.text });
+    sendSuccess(res, { turn, conversation: card.conversation, canSubmit: card.sweepAnswers.length > 0 });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Memory scaffold for capture: my own tasks on this project — context, never evidence
 router.get('/api/caps/context', async (req, res, next) => {
   try {

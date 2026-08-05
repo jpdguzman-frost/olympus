@@ -154,26 +154,31 @@ export function buildOutputSchema(track) {
 }
 
 function renderCardInput(card, capsScaffold = null) {
-  const answers = card.rawAnswers
-    .map((a) =>
-      a.questionIndex === null || a.questionIndex === undefined
-        ? `SINGLE-PASS ANSWER:\n${a.answer}`
-        : `Q${a.questionIndex + 1}: ${a.question}\nA${a.questionIndex + 1}: ${a.answer}`,
-    )
-    .join('\n\n');
-  const sweeps = card.sweepAnswers
-    .map((s) => `SWEEP PROMPT: ${s.prompt}\nSWEEP ANSWER: ${s.answer}`)
-    .join('\n\n');
   const parts = [
     `SUBJECT (${card.subject.kind}): ${card.subject.name}`,
     `CLOSE DATE: ${card.closeDate ? card.closeDate.toISOString().slice(0, 10) : 'not set'}`,
-    '',
-    'RAW ANSWERS (verbatim, any language):',
-    answers,
-    '',
-    'COVERAGE SWEEP:',
-    sweeps,
   ];
+  if (card.captureMode === 'conversation' && card.conversation?.length) {
+    // B7: the capture ran as a conversation. Only TALENT turns are
+    // evidence — the FR-10 verbatim check reads rawAnswers, which holds
+    // exactly the talent's words.
+    parts.push('', 'CAPTURE CONVERSATION (only the TALENT lines are evidence; quotes must come from them):');
+    for (const turn of card.conversation) {
+      parts.push(`${turn.role === 'ai' ? 'ASSISTANT' : 'TALENT'}: ${turn.text}`);
+    }
+  } else {
+    const answers = card.rawAnswers
+      .map((a) =>
+        a.questionIndex === null || a.questionIndex === undefined
+          ? `ANSWER:\n${a.answer}`
+          : `Q${a.questionIndex + 1}: ${a.question}\nA${a.questionIndex + 1}: ${a.answer}`,
+      )
+      .join('\n\n');
+    const sweeps = card.sweepAnswers
+      .map((s) => `SWEEP PROMPT: ${s.prompt}\nSWEEP ANSWER: ${s.answer}`)
+      .join('\n\n');
+    parts.push('', 'RAW ANSWERS (verbatim, any language):', answers, '', 'COVERAGE SWEEP:', sweeps);
+  }
   // A2/A3: the CAPS memory scaffold — whitelisted task names, categories
   // and dates ONLY. It is context and a date source, NEVER evidence:
   // claims come from the talent's words alone, and quotes must be theirs.
@@ -197,7 +202,7 @@ function renderCardInput(card, capsScaffold = null) {
     '',
     'THE TASK, NOW: you are the structuring step of the pipeline your rules describe.',
     'This is a FILED card, not a live chat — the talent is not present to answer you here.',
-    'The capture already happened: the plain four questions above WERE asked and answered.',
+    'The capture already happened: the questions above WERE asked and answered (as a form or a conversation).',
     'If no CAPS scaffold appears above, that only means no scaffold exists — the answers are still the complete input. Structure them.',
     'In one pass, apply your rules to the raw answers above:',
     '- Draft EVERY claim their words support, each at the lowest plausible reading, controlled vocabulary only.',
