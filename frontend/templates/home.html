@@ -71,6 +71,38 @@
     </section>
   {{/if}}
 
+  {{#if signoffs.length}}
+    <section>
+      <div class="section-label">Picks to check <span class="count">{{signoffs.length}}</span></div>
+      {{#each signoffs}}
+        <article class="record">
+          <div class="record-head">
+            <span class="record-subject">{{.subject.name}}</span>
+            <span class="meta">{{.talentName}}</span>
+          </div>
+          <div class="record-meta">
+            {{#if .periodTag}}<span class="tag">{{.periodTag}}</span>{{/if}}
+            <span>{{.talentName}} picked <strong style="color: var(--ink);">{{.nomineeName}}</strong> to confirm this card</span>
+            {{#if .repeatStreak >= 2}}
+              <span class="tag" style="color: var(--amber-ink);">same pair {{.repeatStreak}} cards in a row</span>
+            {{/if}}
+          </div>
+          <p class="muted" style="font-size: var(--text-sm); margin: 0.5rem 0 0;">
+            One question: did {{.nomineeName}} really see this work? Say how you know, or send the pick back.
+          </p>
+          <div class="sweep-actions" style="margin-top: 0.5rem; flex-wrap: wrap;">
+            <input type="text" value="{{.confirmNote}}" placeholder="How do you know they saw it? (one line)" style="flex: 2;" />
+            <button class="btn btn-primary" on-click="@this.confirmSignoff(this)">They saw it</button>
+          </div>
+          <div class="sweep-actions" style="margin-top: 0.4rem; flex-wrap: wrap;">
+            <input type="text" value="{{.refuseReason}}" placeholder="Why not? (goes back to the talent)" style="flex: 2;" />
+            <button class="btn btn-danger" on-click="@this.refuseSignoff(this)">Send the pick back</button>
+          </div>
+        </article>
+      {{/each}}
+    </section>
+  {{/if}}
+
   {{#if queue.length}}
     <section>
       <div class="section-label">To review <span class="count">{{queue.length}}</span></div>

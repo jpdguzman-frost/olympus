@@ -72,9 +72,20 @@ const nominationSchema = new Schema(
       advocateBlock: { type: Schema.Types.Mixed, default: null },
       exposure: { type: Schema.Types.Mixed, default: null },
     },
+    // Superseded by A1 (kept for pre-amendment cards' history).
     leadDecision: {
       action: { type: String, enum: ['approve', 'reject', null], default: null },
-      reason: { type: String, default: null }, // required on reject (FR-14)
+      reason: { type: String, default: null },
+      by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+      at: { type: Date, default: null },
+    },
+    // A1/C3: the exposure verifier's one-line sign-off (never verdict
+    // authority, never substitution). Refusal returns the pick to the
+    // talent with a stated reason — Invariant 4's rejection leg, re-homed.
+    exposureSignoff: {
+      decision: { type: String, enum: ['confirm', 'refuse', null], default: null },
+      note: { type: String, default: null }, // confirm: how they know the pick saw the work
+      reason: { type: String, default: null }, // refuse: required
       by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
       at: { type: Date, default: null },
     },

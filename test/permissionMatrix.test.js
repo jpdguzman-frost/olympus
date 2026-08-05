@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { makeTestContext, routeCardTo, talentApproveFixture } from './helpers/testApp.js';
+import { Track } from '../src/models/Track.js';
 
 let ctx;
 let agents; // per-role supertest agents with live sessions
@@ -19,6 +20,8 @@ beforeAll(async () => {
     reviewer: await ctx.loginAs(ctx.users.reviewer),
     admin: await ctx.loginAs(ctx.users.admin),
   };
+  // A1: nominations go to the track's exposure verifier for sign-off.
+  await Track.updateOne({ key: 'ops' }, { exposureVerifierId: ctx.users.lead._id });
 });
 
 afterAll(() => ctx.teardown());
@@ -58,33 +61,16 @@ describe('own card answers/edits — talent only', () => {
   });
 });
 
-describe('card shell — lead only, own reports only, name+date only', () => {
-  it('lead opens a shell for their report', async () => {
-    const res = await agents.lead.post('/api/team/shells').send({
-      reportUserId: ctx.users.talentA._id.toString(),
-      subjectName: 'Sun Life',
-      closeDate: '2026-05-31',
-    });
-    expect(res.status).toBe(201);
-    expect(res.body.data.rawAnswers).toHaveLength(0); // no content — FR-5
-  });
-
-  it('talent cannot open a shell', async () => {
-    const res = await agents.talentA.post('/api/team/shells').send({
-      reportUserId: ctx.users.talentB._id.toString(),
-      subjectName: 'X',
-      closeDate: '2026-05-31',
-    });
-    expect(res.status).toBe(403);
-  });
-
-  it('a lead cannot shell someone else\'s report', async () => {
-    const res = await agents.otherLead.post('/api/team/shells').send({
-      reportUserId: ctx.users.talentA._id.toString(),
-      subjectName: 'X',
-      closeDate: '2026-05-31',
-    });
-    expect(res.status).toBe(403);
+describe('card shells — RETIRED (Ruling C4)', () => {
+  it('the shell endpoint is gone for everyone, lead included', async () => {
+    for (const agent of [agents.lead, agents.talentA, agents.admin]) {
+      const res = await agent.post('/api/team/shells').send({
+        reportUserId: ctx.users.talentA._id.toString(),
+        subjectName: 'Sun Life',
+        closeDate: '2026-05-31',
+      });
+      expect(res.status).toBe(404);
+    }
   });
 });
 
@@ -101,7 +87,15 @@ describe('nominee tag — talent, own card only, after their approval (FR-13)', 
       nomineeIds: [ctx.users.reviewer._id.toString()],
     });
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('lead-nominee-review');
+    expect(res.body.data.status).toBe('exposure-signoff'); // A1: no lead approval
+  });
+
+  it('two nominees are refused — exactly one per card (C2)', async () => {
+    const card = await approvedCard();
+    const res = await agents.talentA.post(`/api/cards/${card._id}/nominate`).send({
+      nomineeIds: [ctx.users.reviewer._id.toString(), ctx.users.talentB._id.toString()],
+    });
+    expect(res.status).toBe(400);
   });
 
   it('nomination before approval is refused (Invariant 5: nothing routes early)', async () => {
@@ -151,7 +145,7 @@ describe('nominee tag — talent, own card only, after their approval (FR-13)', 
   });
 });
 
-describe('nominee approve/reject — lead selects among the talent\'s picks (FR-14)', () => {
+describe('exposure sign-off — verifier setting only, never substitution (A1/C3)', () => {
   async function nominatedCard() {
     const card = await makeDraft(agents.talentA);
     await talentApproveFixture(card._id, ctx.users.talentA._id);
@@ -161,50 +155,50 @@ describe('nominee approve/reject — lead selects among the talent\'s picks (FR-
     return card;
   }
 
-  it('lead rejects WITH a reason — the card returns to the talent', async () => {
+  it('the verifier refuses WITH a reason — the pick returns to the talent (C3)', async () => {
     const card = await nominatedCard();
-    const res = await agents.lead.post(`/api/cards/${card._id}/nominee-decision`).send({
-      action: 'reject',
-      reason: 'Named call-maker on this card',
+    const res = await agents.lead.post(`/api/cards/${card._id}/signoff`).send({
+      action: 'refuse',
+      reason: 'They joined after this project closed',
     });
     expect(res.status).toBe(200);
-    expect(res.body.data.nomination.leadDecision.action).toBe('reject');
+    expect(res.body.data.nomination.exposureSignoff.decision).toBe('refuse');
     expect(res.body.data.status).toBe('talent-approved'); // pick returned
   });
 
-  it('lead cannot reject without a reason', async () => {
+  it('refusing without a reason is refused', async () => {
     const card = await nominatedCard();
-    const res = await agents.lead.post(`/api/cards/${card._id}/nominee-decision`).send({ action: 'reject' });
+    const res = await agents.lead.post(`/api/cards/${card._id}/signoff`).send({ action: 'refuse' });
     expect(res.status).toBe(400);
   });
 
-  it('talent cannot decide on nominees', async () => {
+  it('nobody but the named verifier can sign off — talent, other lead, ADMIN all rejected', async () => {
     const card = await nominatedCard();
-    const res = await agents.talentA.post(`/api/cards/${card._id}/nominee-decision`).send({
-      action: 'approve',
-      approvedNomineeId: ctx.users.reviewer._id.toString(),
-    });
-    expect(res.status).toBe(403);
+    for (const agent of [agents.talentA, agents.otherLead, agents.admin, agents.reviewer]) {
+      const res = await agent.post(`/api/cards/${card._id}/signoff`).send({
+        action: 'confirm',
+        note: 'x',
+      });
+      expect(res.status).toBe(403);
+    }
   });
 
-  it('approval must select one of the TALENT\'S nominees — substitution is rejected (Invariant 4)', async () => {
+  it('sign-off has no substitution input: confirming routes to the TALENT\'S pick, only (Invariant 4)', async () => {
     const card = await nominatedCard();
-    const res = await agents.lead.post(`/api/cards/${card._id}/nominee-decision`).send({
-      action: 'approve',
-      approvedNomineeId: ctx.users.talentB._id.toString(), // not a nominee
-    });
-    expect(res.status).toBe(400);
-  });
-
-  it('approval of a real nominee routes the card to them (FR-16)', async () => {
-    const card = await nominatedCard();
-    const res = await agents.lead.post(`/api/cards/${card._id}/nominee-decision`).send({
-      action: 'approve',
-      approvedNomineeId: ctx.users.reviewer._id.toString(),
+    const res = await agents.lead.post(`/api/cards/${card._id}/signoff`).send({
+      action: 'confirm',
+      note: 'They reviewed this account weekly — I saw the threads',
+      approvedNomineeId: ctx.users.talentB._id.toString(), // ignored by construction
     });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('routed');
     expect(res.body.data.nomination.routedTo).toBe(ctx.users.reviewer._id.toString());
+  });
+
+  it('confirming needs the one-line note', async () => {
+    const card = await nominatedCard();
+    const res = await agents.lead.post(`/api/cards/${card._id}/signoff`).send({ action: 'confirm' });
+    expect(res.status).toBe(400);
   });
 });
 

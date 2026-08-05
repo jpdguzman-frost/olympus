@@ -152,11 +152,11 @@ function cardText(card) {
 }
 
 /**
- * System checks (FR-13): (a) advocate block — the nominee is not the
- * lead, endorser, or a named call-maker on the card; (b) exposure —
- * verified when the nominee has a card on the same subject; otherwise
- * recorded as unverified for the lead, who owns exposure approval (P-2).
- * A failed hard check returns the pick to the talent with the reason.
+ * System checks (FR-13 as amended by A1): advocate block only — the
+ * nominee is not the talent, their lead, or a named call-maker on the
+ * card. Exposure is no longer checked here: it is auto-verified from
+ * CAPS (B5) or signed off by the track's exposure verifier.
+ * A failed check returns the pick to the talent with the reason.
  */
 export async function runSystemChecks(actor, card, nomineeUsers) {
   const failures = [];
@@ -164,11 +164,11 @@ export async function runSystemChecks(actor, card, nomineeUsers) {
 
   for (const nominee of nomineeUsers) {
     if (nominee._id.equals(actor._id)) {
-      failures.push({ nominee: nominee.name, reason: 'You cannot nominate yourself' });
+      failures.push({ nominee: nominee.name, reason: 'You cannot pick yourself' });
       continue;
     }
     if (actor.leadId && nominee._id.equals(actor.leadId)) {
-      failures.push({ nominee: nominee.name, reason: 'Your Lead cannot be your confirmer (advocate block)' });
+      failures.push({ nominee: nominee.name, reason: 'Your lead cannot be your confirmer (advocate block)' });
       continue;
     }
     const firstName = nominee.name.split(' ')[0].toLowerCase();
@@ -180,19 +180,17 @@ export async function runSystemChecks(actor, card, nomineeUsers) {
     }
   }
 
-  const exposure = {};
-  for (const nominee of nomineeUsers) {
-    const attached = await Card.exists({
-      talentId: nominee._id,
-      'subject.name': card.subject.name,
-    });
-    exposure[nominee.name] = attached ? 'seen the work — checked' : 'not proven yet — your lead decides';
-  }
-
-  return { failures, exposure };
+  return { failures };
 }
 
-export async function submitNomination(actor, cardId, { nomineeIds = [], thinPool = false } = {}) {
+/**
+ * C2: exactly one nominee per card. A1: no lead approval — the card
+ * goes to the track's exposure verifier for a one-line sign-off
+ * (until CAPS auto-verify lands in B5). Nobody can substitute the
+ * pick: the only route out of sign-off routes to nominees[0] or back
+ * to the talent.
+ */
+export async function submitNomination(actor, cardId, { nomineeId = null, nomineeIds = [], thinPool = false } = {}) {
   const card = await Card.findById(cardId);
   if (!card) throw notFound('Card not found');
   if (!card.talentId.equals(actor._id)) throw forbidden('Only the card\'s talent can nominate');
@@ -203,7 +201,8 @@ export async function submitNomination(actor, cardId, { nomineeIds = [], thinPoo
 
   if (thinPool) {
     // FR-15: no valid nominee exists — the track's fallback reviewer,
-    // visibly marked as the exception path. Names are config (OD-2).
+    // visibly marked as the exception path. Routes direct; a sign-off
+    // on the backup path would check nothing.
     const track = await Track.findOne({ key: card.track });
     if (!track.fallbackReviewerId) {
       throw conflict('No backup path is set up for this track yet — ask JP');
@@ -211,39 +210,68 @@ export async function submitNomination(actor, cardId, { nomineeIds = [], thinPoo
     const fallback = await User.findById(track.fallbackReviewerId);
     card.nomination.nominees = [{ userId: fallback._id, name: fallback.name, role: 'fallback reviewer' }];
     card.nomination.thinPool = true;
-    card.nomination.systemChecks = { advocateBlock: 'bypassed — thin pool', exposure: 'fallback reviewer' };
-  } else {
-    if (nomineeIds.length < 1 || nomineeIds.length > 2) throw badRequest('Nominate 1–2 confirmers');
-    const nomineeUsers = await User.find({ _id: { $in: nomineeIds }, active: true });
-    if (nomineeUsers.length !== nomineeIds.length) throw badRequest('Unknown nominee');
-
-    const { failures, exposure } = await runSystemChecks(actor, card, nomineeUsers);
-    if (failures.length) {
-      // The pick returns to the talent with the reason — nothing routes.
-      throw badRequest('A system check returned your pick', { failures });
-    }
-    card.nomination.nominees = nomineeUsers.map((u) => ({ userId: u._id, name: u.name, role: 'confirmer' }));
-    card.nomination.thinPool = false;
-    card.nomination.systemChecks = { advocateBlock: 'passed', exposure };
+    card.nomination.systemChecks = { advocateBlock: 'bypassed — thin pool', exposure: 'backup path' };
+    card.nomination.routedTo = fallback._id;
+    card.nomination.routedAt = new Date();
+    pushCardAudit(card, {
+      by: actor._id,
+      action: 'nomination-submitted',
+      after: { nominees: [fallback.name], thinPool: true },
+    });
+    await transition(card, 'routed', actor._id, 'thin pool — routed to the backup path, visibly marked');
+    await card.save();
+    await recordAudit({ actorId: actor._id, action: 'card.nomination-submitted', entity: 'card', entityId: card._id });
+    return card;
   }
 
-  card.nomination.leadDecision = { action: null, reason: null, by: null, at: null };
+  const ids = nomineeId ? [nomineeId] : nomineeIds;
+  if (ids.length !== 1) throw badRequest('Pick exactly one person (C2)');
+  const nomineeUsers = await User.find({ _id: { $in: ids }, active: true });
+  if (nomineeUsers.length !== 1) throw badRequest('Unknown nominee');
+
+  const { failures } = await runSystemChecks(actor, card, nomineeUsers);
+  if (failures.length) {
+    // The pick returns to the talent with the reason — nothing routes.
+    throw badRequest('A system check returned your pick', { failures });
+  }
+
+  const track = await Track.findOne({ key: card.track });
+  if (!track.exposureVerifierId) {
+    throw conflict('No one is set up to check picks on this track yet — ask JP');
+  }
+
+  card.nomination.nominees = nomineeUsers.map((u) => ({ userId: u._id, name: u.name, role: 'confirmer' }));
+  card.nomination.thinPool = false;
+  card.nomination.systemChecks = { advocateBlock: 'passed', exposure: 'awaiting sign-off' };
+  card.nomination.exposureSignoff = { decision: null, note: null, reason: null, by: null, at: null };
   pushCardAudit(card, {
     by: actor._id,
     action: 'nomination-submitted',
-    after: { nominees: card.nomination.nominees.map((n) => n.name), thinPool: card.nomination.thinPool },
+    after: { nominees: card.nomination.nominees.map((n) => n.name) },
   });
-  await transition(card, 'lead-nominee-review', actor._id);
+  await transition(card, 'exposure-signoff', actor._id, 'pick goes to the exposure verifier for a one-line sign-off (A1)');
   await card.save();
   await recordAudit({ actorId: actor._id, action: 'card.nomination-submitted', entity: 'card', entityId: card._id });
   return card;
 }
 
-/** Eligible nominees for the picker: active users, minus self and own lead. */
+/**
+ * Eligible nominees for the picker: active users, minus self and own
+ * lead — each with their current repeat streak (C5: rotation prompt at
+ * nomination time, talent-facing, advisory, never blocking).
+ */
 export async function nomineeCandidates(actor) {
   const query = { active: true, _id: { $ne: actor._id } };
   if (actor.leadId) query._id = { $nin: [actor._id, actor.leadId] };
-  return User.find(query, { name: 1, track: 1, roles: 1 }).sort({ name: 1 });
+  const users = await User.find(query, { name: 1, track: 1, roles: 1 }).sort({ name: 1 });
+  return Promise.all(
+    users.map(async (u) => ({
+      _id: u._id,
+      name: u.name,
+      track: u.track,
+      repeatStreak: await repeatStreakFor(actor._id, u._id),
+    })),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -266,68 +294,85 @@ export async function repeatStreakFor(talentId, reviewerId) {
   return streak;
 }
 
-export async function leadNomineeQueue(actor) {
-  if (!actor.hasRole('lead')) throw forbidden('Lead role required');
-  const reports = await User.find({ leadId: actor._id, active: true }, { _id: 1, name: 1 });
+/**
+ * A1: cards waiting on THIS user's exposure sign-off — they are the
+ * exposure verifier on the card's track (the admin setting, read at
+ * request time). Payload carries what the check needs and nothing
+ * more: who filed, what project, who they picked. No claims.
+ */
+export async function signoffQueue(actor) {
+  const tracks = await Track.find({ exposureVerifierId: actor._id }, { key: 1 });
+  if (!tracks.length) return [];
   const cards = await Card.find({
-    talentId: { $in: reports.map((r) => r._id) },
-    status: 'lead-nominee-review',
+    track: { $in: tracks.map((t) => t.key) },
+    status: 'exposure-signoff',
   }).sort({ updatedAt: 1 });
 
-  const names = Object.fromEntries(reports.map((r) => [r._id.toString(), r.name]));
+  const talentIds = [...new Set(cards.map((c) => c.talentId.toString()))];
+  const talents = await User.find({ _id: { $in: talentIds } }, { name: 1 });
+  const names = Object.fromEntries(talents.map((t) => [t._id.toString(), t.name]));
+
   return Promise.all(
-    cards.map(async (card) => {
-      const streaks = {};
-      for (const nominee of card.nomination.nominees) {
-        streaks[nominee.name] = await repeatStreakFor(card.talentId, nominee.userId);
-      }
-      const obj = card.toObject();
-      obj.talentName = names[card.talentId.toString()];
-      obj.repeatStreaks = streaks; // FR-17: 3rd consecutive time surfaces a rotation prompt
-      return obj;
-    }),
+    cards.map(async (card) => ({
+      _id: card._id,
+      subject: card.subject,
+      periodTag: card.periodTag,
+      track: card.track,
+      talentName: names[card.talentId.toString()] ?? '—',
+      nomineeName: card.nomination.nominees[0]?.name ?? '—',
+      repeatStreak: card.nomination.nominees[0]
+        ? await repeatStreakFor(card.talentId, card.nomination.nominees[0].userId)
+        : 0,
+    })),
   );
 }
 
 /**
- * FR-14: approve (selecting ONE of the talent's nominees) or reject with
- * a required reason. Selection is not substitution — the choice set is
- * exactly what the talent tagged (Invariant 4).
+ * A1/C3: the exposure verifier's decision. Confirm needs one line
+ * (how they know the pick saw the work) and routes to the talent's
+ * pick — nominees[0], nothing else; there is no substitution input.
+ * Refuse needs a stated reason and returns the pick to the talent
+ * (Invariant 4's rejection leg, re-homed). Never verdict authority.
  */
-export async function decideNomination(actor, cardId, { action, reason = null, approvedNomineeId = null }) {
+export async function decideSignoff(actor, cardId, { action, note = null, reason = null } = {}) {
   const card = await Card.findById(cardId);
   if (!card) throw notFound('Card not found');
-  if (!actor.hasRole('lead')) throw forbidden('Only a lead can decide on nominees');
-  const talent = await User.findById(card.talentId);
-  if (!talent?.leadId?.equals?.(actor._id)) throw forbidden('You can only decide for your own reports');
-  if (card.status !== 'lead-nominee-review') {
-    throw conflict(`Card is not awaiting your decision (status "${card.status}")`);
+  if (card.status !== 'exposure-signoff') {
+    throw conflict(`Card is not waiting on a sign-off (status "${card.status}")`);
+  }
+  const track = await Track.findOne({ key: card.track });
+  if (!track?.exposureVerifierId?.equals?.(actor._id)) {
+    throw forbidden('Only the person set to check picks on this track can sign off');
   }
 
-  if (action === 'reject') {
-    if (!reason?.trim()) throw badRequest('A rejection requires a stated reason — it returns the pick to the talent');
-    card.nomination.leadDecision = { action: 'reject', reason, by: actor._id, at: new Date() };
-    pushCardAudit(card, { by: actor._id, action: 'nominee-reject', note: reason });
-    await transition(card, 'talent-approved', actor._id, 'nominee rejected — pick returns to the talent');
+  if (action === 'refuse') {
+    if (!reason?.trim()) throw badRequest('Refusing needs a stated reason — it goes back to the talent');
+    card.nomination.exposureSignoff = { decision: 'refuse', note: null, reason: reason.trim(), by: actor._id, at: new Date() };
+    card.nomination.systemChecks.exposure = 'refused — pick returned';
+    pushCardAudit(card, { by: actor._id, action: 'signoff-refuse', note: reason.trim() });
+    await transition(card, 'talent-approved', actor._id, 'sign-off refused — pick returns to the talent (C3)');
     await card.save();
-    await recordAudit({ actorId: actor._id, action: 'card.nominee-reject', entity: 'card', entityId: card._id, after: { reason } });
+    await recordAudit({ actorId: actor._id, action: 'card.signoff-refuse', entity: 'card', entityId: card._id, after: { reason: reason.trim() } });
     return card;
   }
 
-  if (action !== 'approve') throw badRequest('Decision is approve or reject');
-  const chosen = card.nomination.nominees.find((n) => n.userId.toString() === String(approvedNomineeId));
-  if (!chosen) throw badRequest('The approved confirmer must be one of the talent\'s nominees'); // Invariant 4
+  if (action !== 'confirm') throw badRequest('Decision is confirm or refuse');
+  if (!note?.trim()) throw badRequest('One line, please: how do you know they saw this work?');
 
-  card.nomination.leadDecision = { action: 'approve', reason, by: actor._id, at: new Date() };
-  card.nomination.routedTo = chosen.userId;
+  const pick = card.nomination.nominees[0];
+  if (!pick) throw conflict('No pick on this card');
+
+  card.nomination.exposureSignoff = { decision: 'confirm', note: note.trim(), reason: null, by: actor._id, at: new Date() };
+  card.nomination.systemChecks.exposure = 'signed off';
+  card.nomination.routedTo = pick.userId;
   card.nomination.routedAt = new Date(); // A5: the SLA clock starts here
-  card.nomination.repeatStreak = (await repeatStreakFor(card.talentId, chosen.userId)) + 1;
-  pushCardAudit(card, { by: actor._id, action: 'nominee-approve', note: `routed to ${chosen.name}` });
-  await transition(card, 'routed', actor._id, `routed to ${chosen.name}`);
+  card.nomination.repeatStreak = (await repeatStreakFor(card.talentId, pick.userId)) + 1;
+  pushCardAudit(card, { by: actor._id, action: 'signoff-confirm', note: note.trim() });
+  await transition(card, 'routed', actor._id, `signed off — routed to ${pick.name}`);
   await card.save();
   await recordAudit({
-    actorId: actor._id, action: 'card.nominee-approve', entity: 'card', entityId: card._id,
-    after: { routedTo: chosen.name, repeatStreak: card.nomination.repeatStreak },
+    actorId: actor._id, action: 'card.signoff-confirm', entity: 'card', entityId: card._id,
+    after: { routedTo: pick.name, repeatStreak: card.nomination.repeatStreak },
   });
   return card;
 }

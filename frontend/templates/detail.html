@@ -174,16 +174,19 @@
         <div class="section-label">Pick who confirms this</div>
         <div class="shell-form">
           <p class="muted" style="font-size: var(--text-sm); margin-bottom: 0.75rem;">
-            Pick someone who saw this work. Not your lead. No one can swap in a different pick — only you choose.
+            Pick ONE person who saw this work. Not your lead. No one can swap in a different pick — only you choose.
           </p>
           {{#each candidates}}
             <label style="display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0; font-size: var(--text-sm);">
-              <input type="checkbox" name="{{~/nomineePick}}" value="{{._id}}" />
+              <input type="radio" name="nominee" checked="{{nomineePick === ._id}}" on-click="@this.set('nomineePick', ._id)" />
               {{.name}} <span class="meta">{{#if .track}}{{.track}}{{/if}}</span>
+              {{#if .repeatStreak >= 2}}
+                <span class="tag" style="color: var(--amber-ink);">you've used them {{.repeatStreak}} cards in a row — maybe pick someone new (your call)</span>
+              {{/if}}
             </label>
           {{/each}}
           <div class="sweep-actions" style="margin-top: 0.75rem;">
-            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick.length || nomineePick.length > 2}}">Send my pick</button>
+            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick}}">Send my pick</button>
             <button class="btn btn-secondary" on-click="@this.submitThinPool()">No one fits — use the backup path</button>
           </div>
         </div>
@@ -210,9 +213,9 @@
     </div>
   {{/if}}
 
-  {{#if card.nomination && card.nomination.leadDecision && card.nomination.leadDecision.action === 'reject' && card.status === 'talent-approved'}}
+  {{#if card.nomination && card.nomination.exposureSignoff && card.nomination.exposureSignoff.decision === 'refuse' && card.status === 'talent-approved'}}
     <div class="banner banner-warn">
-      Your lead sent your pick back: “{{card.nomination.leadDecision.reason}}” Pick someone else.
+      Your pick came back: “{{card.nomination.exposureSignoff.reason}}” Pick someone else.
     </div>
     <button class="btn btn-primary" on-click="@this.openNomination()">Pick someone</button>
     {{#if nominating}}
@@ -221,16 +224,25 @@
         <div class="shell-form">
           {{#each candidates}}
             <label style="display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0; font-size: var(--text-sm);">
-              <input type="checkbox" name="{{~/nomineePick}}" value="{{._id}}" />
+              <input type="radio" name="nominee2" checked="{{nomineePick === ._id}}" on-click="@this.set('nomineePick', ._id)" />
               {{.name}} <span class="meta">{{#if .track}}{{.track}}{{/if}}</span>
+              {{#if .repeatStreak >= 2}}
+                <span class="tag" style="color: var(--amber-ink);">you've used them {{.repeatStreak}} cards in a row — maybe pick someone new (your call)</span>
+              {{/if}}
             </label>
           {{/each}}
           <div class="sweep-actions" style="margin-top: 0.75rem;">
-            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick.length || nomineePick.length > 2}}">Send my pick</button>
+            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick}}">Send my pick</button>
           </div>
         </div>
       </section>
     {{/if}}
+  {{/if}}
+
+  {{#if card.status === 'exposure-signoff'}}
+    <div class="banner banner-info">
+      Your pick is being checked — one quick question to someone who'd know: did they really see this work?
+    </div>
   {{/if}}
 
   <section>

@@ -5,7 +5,7 @@ const STATUS_LABELS = {
   draft: 'Draft',
   structured: 'Ready to check',
   'talent-approved': 'Approved by you',
-  'lead-nominee-review': 'With your lead',
+  'exposure-signoff': 'Checking your pick',
   routed: 'With your reviewer',
   confirmed: 'Confirmed',
   adjust: 'Needs a fix',

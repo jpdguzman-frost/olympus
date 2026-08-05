@@ -89,7 +89,7 @@ Touches: `Card`, `constants` status machine, `cardService.applyVerdict`,
 new `slaWorker`, `routes/admin.js`, admin UI, permissionMatrix +
 statusMachine tests. Est. 3d.
 
-## B3 — Nomination rework (A1/C2/C3/C4/C5)
+## B3 — Nomination rework (A1/C2/C3/C4/C5) — **DONE Aug 5**
 
 Retires the now-unlawful lead-approval leg; medium risk (status
 machine + permission surgery, test rewrites).

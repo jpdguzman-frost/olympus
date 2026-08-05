@@ -183,10 +183,19 @@ router.post('/api/cards/:id/nominate', async (req, res, next) => {
   }
 });
 
-// --- Lead decision (FR-14/FR-17: select among the talent's nominees, or reject) ---
-router.post('/api/cards/:id/nominee-decision', async (req, res, next) => {
+// --- A1/C3: exposure sign-off — the verifier setting decides who may
+// act; there is no substitution input on this endpoint by construction.
+router.get('/api/signoffs', async (req, res, next) => {
   try {
-    sendSuccess(res, await confirm.decideNomination(req.currentUser, req.params.id, req.body ?? {}));
+    sendSuccess(res, await confirm.signoffQueue(req.currentUser));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/cards/:id/signoff', async (req, res, next) => {
+  try {
+    sendSuccess(res, await confirm.decideSignoff(req.currentUser, req.params.id, req.body ?? {}));
   } catch (err) {
     next(err);
   }

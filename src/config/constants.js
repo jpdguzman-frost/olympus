@@ -17,6 +17,13 @@ export const ROLES = ['talent', 'lead', 'nonadvocate', 'admin'];
  * only. Key = from-status, value = the set of statuses reachable from it.
  * adjust → revised is the "back to talent" leg; revised → routed is re-route.
  *
+ * A1/C2/C3 nomination legs (lead approval retired): talent-approved →
+ * exposure-signoff (the track's exposure verifier checks the pick saw
+ * the work) → routed on sign-off, or back to talent-approved on
+ * refusal with a stated reason (C3 — Invariant 4's rejection leg,
+ * re-homed). talent-approved → routed direct is the thin-pool path
+ * now and the CAPS auto-verified path in B5.
+ *
  * C1 deadlock legs: routed → deadlocked (reviewer holds Adjust on a
  * defended claim) → ruled (JP writes a ruling — guidance, never a
  * verdict) → the reviewer writes the verdict themselves (confirmed |
@@ -27,8 +34,8 @@ export const ROLES = ['talent', 'lead', 'nonadvocate', 'admin'];
 export const CARD_STATUS_TRANSITIONS = {
   draft: ['structured'],
   structured: ['talent-approved'],
-  'talent-approved': ['lead-nominee-review'],
-  'lead-nominee-review': ['routed', 'talent-approved'], // reject returns the pick to the talent (FR-14)
+  'talent-approved': ['exposure-signoff', 'routed'],
+  'exposure-signoff': ['routed', 'talent-approved'],
   routed: ['confirmed', 'adjust', 'deadlocked', 'reassigned'],
   deadlocked: ['ruled'],
   ruled: ['confirmed', 'adjust', 'reassigned'],

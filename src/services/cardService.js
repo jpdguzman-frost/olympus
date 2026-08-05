@@ -53,32 +53,10 @@ export async function createDraft(actor, { subjectName = '', closeDate = null, c
   return card;
 }
 
-/** Lead opens a shell for a report: name + close date ONLY, no content (FR-5). */
-export async function createShell(actor, { reportUserId, subjectName, closeDate }) {
-  if (!actor.hasRole('lead')) throw forbidden('Only a lead can open a card shell');
-  if (!subjectName || !closeDate) throw badRequest('A shell is a name and a close date');
-
-  const report = await User.findById(reportUserId);
-  if (!report || !report.active) throw notFound('No such report');
-  if (!report.leadId || !report.leadId.equals(actor._id)) {
-    throw forbidden('You can only open shells for your own reports');
-  }
-  if (!report.track) throw badRequest('That report has no track assigned');
-
-  const card = new Card({
-    talentId: report._id,
-    track: report.track,
-    subject: { name: subjectName, kind: KIND_BY_TRACK[report.track] },
-    closeDate,
-    periodTag: periodTagFor(closeDate),
-    status: 'draft',
-    createdViaShellBy: actor._id,
-  });
-  pushCardAudit(card, { by: actor._id, action: 'shell-created', note: 'lead-opened shell: name + close date only' });
-  await card.save();
-  await recordAudit({ actorId: actor._id, action: 'card.shell-create', entity: 'card', entityId: card._id });
-  return card;
-}
+// FR-5 card shells are RETIRED (Ruling C4, Aug 5): leads no longer open
+// cards for reports. Part 4's core question survives as guidance text on
+// the reviewer screen. createdViaShellBy stays on the schema for
+// pre-amendment cards' history.
 
 // ---------------------------------------------------------------------------
 // Reads (visibility matrix, Plan §4)

@@ -79,9 +79,10 @@ export async function routeCardTo(cardId, reviewerId, actorId) {
   await talentApproveFixture(cardId, actorId);
   const card = await Card.findById(cardId);
   card.nomination.nominees = [{ userId: reviewerId, name: 'Fixture Reviewer', role: 'confirmer' }];
-  await transition(card, 'lead-nominee-review', actorId);
+  await transition(card, 'exposure-signoff', actorId);
   await transition(card, 'routed', actorId);
   card.nomination.routedTo = reviewerId;
+  card.nomination.routedAt = new Date();
   await card.save();
   return card;
 }

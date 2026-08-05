@@ -34,6 +34,7 @@ beforeAll(async () => {
       competencyOrDomainList: VOCAB.competencyOrDomainList,
       controlledVocabulary: VOCAB.controlledVocabulary,
       calibrationMode: false,
+      exposureVerifierId: ctx.users.lead._id, // A1: sign-off stand-in
     },
   );
 });
@@ -191,21 +192,30 @@ describe('STALE context (BR-4)', () => {
   });
 });
 
-describe('lead nominee queue (FR-14/FR-17 surface)', () => {
-  it('shows waiting cards with nominees, checks, and streaks — lead only', async () => {
+describe('exposure sign-off queue (A1) + rotation data at pick time (C5)', () => {
+  it('the verifier sees waiting picks; everyone else sees an empty list', async () => {
     const card = await draft('Queue Card');
     await talentApproveFixture(card._id, ctx.users.talentA._id);
     await agents.talentA.post(`/api/cards/${card._id}/nominate`).send({
       nomineeIds: [ctx.users.talentB._id.toString()],
     });
 
-    const res = await agents.lead.get('/api/team/nominee-queue');
+    const res = await agents.lead.get('/api/signoffs');
     expect(res.status).toBe(200);
     const found = res.body.data.find((c) => c._id === card._id);
     expect(found).toBeTruthy();
     expect(found.talentName).toBe('Talent A');
-    expect(found.repeatStreaks).toBeTruthy();
+    expect(found.nomineeName).toBe('Talent B');
+    expect(found).not.toHaveProperty('claims'); // the check needs no claims
 
-    expect((await agents.talentA.get('/api/team/nominee-queue')).status).toBe(403);
+    expect((await agents.talentA.get('/api/signoffs')).body.data).toEqual([]);
+  });
+
+  it('nominee candidates carry each person\'s repeat streak — advisory, never blocking', async () => {
+    const res = await agents.talentA.get('/api/nominee-candidates');
+    expect(res.status).toBe(200);
+    const reviewerRow = res.body.data.find((c) => c.name === 'Reviewer');
+    expect(typeof reviewerRow.repeatStreak).toBe('number');
+    expect(reviewerRow.repeatStreak).toBeGreaterThanOrEqual(3); // the streak fixtures above
   });
 });

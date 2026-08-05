@@ -20,78 +20,10 @@
 
     <div class="capture-head"><h1>Your team's evidence</h1></div>
 
-    <section>
-      <div class="section-label">Open a card shell</div>
-      <div class="shell-form">
-        <div class="form-row">
-          <label class="field">
-            <span class="field-name">Report</span>
-            <select value="{{shellReportId}}">
-              <option value="">Choose…</option>
-              {{#each reports}}
-                <option value="{{._id}}">{{.name}} — {{.track}}</option>
-              {{/each}}
-            </select>
-          </label>
-          <label class="field">
-            <span class="field-name">Account / project name</span>
-            <input type="text" value="{{shellSubject}}" placeholder="e.g. GCash Design Support" />
-          </label>
-          <label class="field">
-            <span class="field-name">Close date</span>
-            <input type="date" value="{{shellCloseDate}}" />
-          </label>
-        </div>
-        <button class="btn btn-primary" on-click="@this.createShell()"
-          disabled="{{!shellReportId || !shellSubject || !shellCloseDate}}">Open shell</button>
-        <p class="boundary-note">
-          A shell is just the name and the date. All the words are theirs.
-        </p>
-      </div>
-    </section>
-
-    <section>
-      <div class="section-label">Reviewer picks to approve <span class="count">{{queue.length}}</span></div>
-      {{#if queue.length}}
-        {{#each queue: qi}}
-          <article class="record">
-            <div class="record-head">
-              <span class="record-subject">{{.subject.name}}</span>
-              <span class="meta">{{.talentName}}</span>
-              {{#if .nomination.thinPool}}<span class="stamp stamp-adjust" style="position: static; transform: none;">THIN POOL</span>{{/if}}
-            </div>
-            <div class="record-meta">
-              <span class="tag">{{.periodTag}}</span>
-              <span>{{.claims.length}} lines, all approved by the talent</span>
-            </div>
-            {{#each .nomination.nominees}}
-              <div style="border-top: 1px solid var(--rule); padding-top: 0.6rem; margin-top: 0.6rem;">
-                <div class="record-meta">
-                  <strong style="color: var(--ink); font-family: var(--sans);">{{.name}}</strong>
-                  <span>{{.role}}</span>
-                  {{#if ~/queue[qi].repeatStreaks[.name] >= 2}}
-                    <span class="tag" style="color: var(--amber-ink);">
-                      same reviewer {{~/queue[qi].repeatStreaks[.name] + 1}} cards in a row — maybe rotate (your call)
-                    </span>
-                  {{/if}}
-                </div>
-                <p class="muted" style="font-size: var(--text-xs);">
-                  exposure: {{~/queue[qi].nomination.systemChecks.exposure[.name] || 'fallback path'}}
-                </p>
-                <button class="btn btn-primary" on-click="@this.approveNominee(~/queue[qi], this)">Approve — route to {{.name}}</button>
-              </div>
-            {{/each}}
-            <div class="sweep-actions" style="margin-top: 0.75rem;">
-              <input type="text" value="{{.rejectReason}}" placeholder="Why? (required) — goes back to the talent" style="flex: 2;" />
-              <button class="btn btn-danger" on-click="@this.rejectNominee(this)">Send the pick back</button>
-            </div>
-            <p class="boundary-note" style="margin-top: 0.5rem;">You can say yes, or no with a reason. You never pick for them.</p>
-          </article>
-        {{/each}}
-      {{else}}
-        <div class="empty-state">Nothing waiting for you.</div>
-      {{/if}}
-    </section>
+    <div class="banner banner-info" style="margin-bottom: 1rem;">
+      This page is read-only. Picks are checked from the main app by whoever JP set as the checker;
+      reviewers write their own verdicts. You see your people's confirmed records here — counts only, never a ranking.
+    </div>
 
     <section>
       <div class="section-label">Reports <span class="count">{{reports.length}}</span></div>

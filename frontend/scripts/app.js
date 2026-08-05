@@ -17,6 +17,7 @@ const app = new Ractive({
     error: null,
     home: { confirmed: [], drafts: [], inFlight: [], track: null },
     queue: [],
+    signoffs: [],
     ladder: null,
     quarters: {},
     quarterTags: [],
@@ -44,7 +45,7 @@ const app = new Ractive({
     approvedCount: 0,
     nominating: false,
     candidates: [],
-    nomineePick: [],
+    nomineePick: null,
     notice: null,
     actionError: null,
     refuseText: '',
@@ -139,6 +140,27 @@ const app = new Ractive({
     await this.claimAction(claim, { action: 'defend', statement: claim.defenseText });
   },
 
+  // A1: exposure sign-off — one line on how you know the pick saw the work.
+  async confirmSignoff(row) {
+    this.set({ error: null });
+    try {
+      await api('POST', `/api/cards/${row._id}/signoff`, { action: 'confirm', note: row.confirmNote });
+      await loadHome();
+    } catch (err) {
+      this.set('error', err.message);
+    }
+  },
+
+  async refuseSignoff(row) {
+    this.set({ error: null });
+    try {
+      await api('POST', `/api/cards/${row._id}/signoff`, { action: 'refuse', reason: row.refuseReason });
+      await loadHome();
+    } catch (err) {
+      this.set('error', err.message);
+    }
+  },
+
   // C1: post-ruling refusal — final position logged, card goes to the fallback.
   async refuseRuling() {
     this.set({ notice: null, actionError: null });
@@ -183,7 +205,7 @@ const app = new Ractive({
         await this.refreshDetail();
       }
       const candidates = await api('GET', '/api/nominee-candidates');
-      this.set({ candidates, nominating: true, nomineePick: [] });
+      this.set({ candidates, nominating: true, nomineePick: null });
     } catch (err) {
       this.set('actionError', err.message);
     }
@@ -193,9 +215,9 @@ const app = new Ractive({
     this.set({ notice: null, actionError: null });
     try {
       await api('POST', `/api/cards/${this.get('card._id')}/nominate`, {
-        nomineeIds: this.get('nomineePick'),
+        nomineeId: this.get('nomineePick'),
       });
-      this.set({ nominating: false, notice: 'Your pick is in. It goes to your lead next.' });
+      this.set({ nominating: false, notice: 'Your pick is in. Someone who knows the work gives it a quick check next.' });
       await this.refreshDetail();
     } catch (err) {
       const failures = err.failures?.map((f) => `${f.nominee}: ${f.reason}`).join(' · ');
@@ -263,8 +285,12 @@ async function route() {
 }
 
 async function loadHome() {
-  const [home, queue] = await Promise.all([api('GET', '/api/home'), api('GET', '/api/queue')]);
-  app.set({ home, queue, view: 'home' });
+  const [home, queue, signoffs] = await Promise.all([
+    api('GET', '/api/home'),
+    api('GET', '/api/queue'),
+    api('GET', '/api/signoffs'),
+  ]);
+  app.set({ home, queue, signoffs, view: 'home' });
   if (app.get('isTalent')) {
     const [ladder, quarters] = await Promise.all([api('GET', '/api/ladder'), api('GET', '/api/quarters')]);
     app.set({ ladder, quarters, quarterTags: Object.keys(quarters).sort().reverse() });
@@ -289,7 +315,7 @@ async function loadCapture(cardId) {
       vocabFields: Object.keys(track.controlledVocabulary || {}),
       approvedCount: (card.claims || []).filter((c) => c.talentApproved).length,
       nominating: false,
-      nomineePick: [],
+      nomineePick: null,
     });
     return;
   }

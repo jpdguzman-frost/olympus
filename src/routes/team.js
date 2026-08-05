@@ -1,22 +1,17 @@
-/** Lead surface: reports list, card shells (FR-5), confirmed records. */
+/**
+ * Lead surface, as amended by A1/C4: read-only — reports and their
+ * confirmed records. Shells are retired; nominee approval is retired
+ * (the exposure sign-off lives on the main app, keyed to the
+ * exposure-verifier setting, not the lead role).
+ */
 
 import { Router } from 'express';
 import { requireRole } from '../middleware/auth.js';
 import { User } from '../models/User.js';
 import * as cards from '../services/cardService.js';
-import { leadNomineeQueue } from '../services/confirmService.js';
 import { sendSuccess } from '../utils/responseEnvelope.js';
 
 const router = Router();
-
-// FR-14/FR-17: cards awaiting this lead's nominee decision, with repeat streaks
-router.get('/api/team/nominee-queue', requireRole('lead'), async (req, res, next) => {
-  try {
-    sendSuccess(res, await leadNomineeQueue(req.currentUser));
-  } catch (err) {
-    next(err);
-  }
-});
 
 router.get('/api/team/reports', requireRole('lead'), async (req, res, next) => {
   try {
@@ -25,15 +20,6 @@ router.get('/api/team/reports', requireRole('lead'), async (req, res, next) => {
       { name: 1, email: 1, track: 1 },
     ).sort({ name: 1 });
     sendSuccess(res, reports);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/api/team/shells', requireRole('lead'), async (req, res, next) => {
-  try {
-    const { reportUserId, subjectName, closeDate } = req.body ?? {};
-    sendSuccess(res, await cards.createShell(req.currentUser, { reportUserId, subjectName, closeDate }), 201);
   } catch (err) {
     next(err);
   }
