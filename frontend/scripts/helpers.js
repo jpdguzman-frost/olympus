@@ -1,17 +1,18 @@
 /* Display helpers shared across pages. */
 
+/* JP's rule: words so simple a J1 gets them without thinking. */
 const STATUS_LABELS = {
   draft: 'Draft',
-  structured: 'Structured',
+  structured: 'Ready to check',
   'talent-approved': 'Approved by you',
   'lead-nominee-review': 'With your lead',
   routed: 'With your reviewer',
   confirmed: 'Confirmed',
   adjust: 'Needs a fix',
-  revised: 'Revised',
-  deadlocked: 'Deadlocked — with JP',
-  ruled: 'JP ruled — back with your reviewer',
-  reassigned: 'With the fallback reviewer',
+  revised: 'Updated',
+  deadlocked: 'Stuck — with JP',
+  ruled: 'JP replied — with reviewer',
+  reassigned: 'With a backup reviewer',
   archived: 'Archived',
 };
 
@@ -38,26 +39,28 @@ function answeredCount(card) {
   return Math.min(real.length, 4);
 }
 
-/* FR-12: flags render as plain-language nudges, never as jargon. */
+/* FR-12: flags render as plain-language nudges, never as jargon.
+   The KEYS are pack vocabulary — verbatim, never reworded (Invariant 1).
+   The VALUES are ours — J1-simple, never blaming (A4). */
 const FLAG_NUDGES = {
-  'NEEDS-OWNER': 'Who made the call here? Name them plainly.',
-  'COULD-BE-HIGHER': 'This might be higher than claimed — if it is, say it plainly in your words and fix the label.',
-  'NEEDS-2A': 'A created-direction claim needs the project details: who shaped it, who decided, who carried it, and how many came after you.',
-  'NEEDS-INVOLVEMENT': 'Say what YOU did in this — whose hands, what pass.',
-  'FLOOR-BLOCKS-CLIMB': 'Someone still refines this work before it goes out, so a direction claim can’t stand on this project.',
-  STALE: 'Filed a while after the work closed — context for your reviewer, never a penalty.',
-  'PROPOSED-BOLT-IN': 'This extra skill isn’t on the recognized list — it’s recorded, and JP will look at it.',
-  'THIN-POOL': 'This went through the fallback path because no valid confirmer existed.',
-  'NOT-TRIGGERED': 'Nothing on record here — that’s a valid state, not a gap.',
-  /* Pack v0.4 §B8 claim-level flags (A4: talent-facing language never blames). */
-  'Floor met': 'The floor holds on its own — nobody has to check behind you.',
-  'Call not owned': 'The call sat elsewhere here — recorded honestly, and that’s fine.',
-  "did not make the call — doesn't lift level": 'You did the work; someone else made the call. It counts — it just doesn’t lift the level.',
-  'No disruption on record — not a gap': 'Nothing disrupted the flow on your watch — a valid state, not a gap.',
-  'insufficient detail — draft': 'Kept as draft — add the missing detail anytime; nothing is lost.',
-  'signal noted, not claimed': 'A signal you chose not to claim is noted — no pressure; your reviewer can still raise it.',
-  'not yet reached — not a gap': 'Not part of your work yet — a valid state, not a gap.',
-  "designed, not held — doesn't lift level": 'You designed it, but the project didn’t run on it — recorded; it doesn’t lift the level.',
+  'NEEDS-OWNER': 'Who made this call? Write their name.',
+  'COULD-BE-HIGHER': 'This might be bigger than it says. If so, say it plainly and fix the label.',
+  'NEEDS-2A': 'You made a new direction? Tell us who shaped it, who decided, who carried it, and how many people came after you.',
+  'NEEDS-INVOLVEMENT': 'Tell us what YOU did here, in your own words.',
+  'FLOOR-BLOCKS-CLIMB': 'Someone still fixes this work before it goes out. So a direction claim can’t count on this project.',
+  STALE: 'Filed long after the work ended. Just context for your reviewer. Not a penalty.',
+  'PROPOSED-BOLT-IN': 'This extra skill is not on the list yet. It is saved, and JP will look at it.',
+  'THIN-POOL': 'No reviewer fit this card, so it took the backup path.',
+  'NOT-TRIGGERED': 'Nothing happened here yet. That is fine. Not a gap.',
+  /* Pack v0.4 §B8 claim-level flags. */
+  'Floor met': 'You hold this on your own. No one checks behind you.',
+  'Call not owned': 'The call was not yours here. Written down honestly. That is fine.',
+  "did not make the call — doesn't lift level": 'You did the work. Someone else made the call. It still counts — it just does not raise your level.',
+  'No disruption on record — not a gap': 'Nothing broke on your watch. That is fine. Not a gap.',
+  'insufficient detail — draft': 'Saved as draft. Add the missing detail any time. Nothing is lost.',
+  'signal noted, not claimed': 'We saw something you chose not to claim. It is noted. No pressure. Your reviewer may still ask.',
+  'not yet reached — not a gap': 'Not part of your work yet. That is fine. Not a gap.',
+  "designed, not held — doesn't lift level": 'You designed it, but the project did not run on it. Saved — it just does not raise your level.',
 };
 
 function flagNudge(flag) {

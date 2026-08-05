@@ -260,6 +260,10 @@ the appendix [likely].
 
 ## Standing constraints
 
+**Copy rule (JP, Aug 5): every user-facing word is J1-simple — short
+sentences, everyday words, no jargon, "so simple it's hard to miss."
+Exception: pack vocabulary is verbatim, never reworded (Invariant 1).**
+
 Verdict sovereignty absolute (JP's ruling is guidance, never a
 verdict). AI never levels. Default-down. No ranking views. Karen's
 held calibration card untouched throughout. Intent v2 loaded as

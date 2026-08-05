@@ -45,13 +45,13 @@
         <button class="btn btn-primary" on-click="@this.createShell()"
           disabled="{{!shellReportId || !shellSubject || !shellCloseDate}}">Open shell</button>
         <p class="boundary-note">
-          A shell is the name and the close date — nothing else. The answers, the nominations, and the words are theirs.
+          A shell is just the name and the date. All the words are theirs.
         </p>
       </div>
     </section>
 
     <section>
-      <div class="section-label">Confirmer approvals <span class="count">{{queue.length}}</span></div>
+      <div class="section-label">Reviewer picks to approve <span class="count">{{queue.length}}</span></div>
       {{#if queue.length}}
         {{#each queue: qi}}
           <article class="record">
@@ -62,7 +62,7 @@
             </div>
             <div class="record-meta">
               <span class="tag">{{.periodTag}}</span>
-              <span>{{.claims.length}} claims, all approved by the talent</span>
+              <span>{{.claims.length}} lines, all approved by the talent</span>
             </div>
             {{#each .nomination.nominees}}
               <div style="border-top: 1px solid var(--rule); padding-top: 0.6rem; margin-top: 0.6rem;">
@@ -71,7 +71,7 @@
                   <span>{{.role}}</span>
                   {{#if ~/queue[qi].repeatStreaks[.name] >= 2}}
                     <span class="tag" style="color: var(--amber-ink);">
-                      same reviewer {{~/queue[qi].repeatStreaks[.name] + 1}} cards in a row — consider rotating (your call)
+                      same reviewer {{~/queue[qi].repeatStreaks[.name] + 1}} cards in a row — maybe rotate (your call)
                     </span>
                   {{/if}}
                 </div>
@@ -82,14 +82,14 @@
               </div>
             {{/each}}
             <div class="sweep-actions" style="margin-top: 0.75rem;">
-              <input type="text" value="{{.rejectReason}}" placeholder="Reason (required) — returns the pick to the talent" style="flex: 2;" />
-              <button class="btn btn-danger" on-click="@this.rejectNominee(this)">Reject nominees</button>
+              <input type="text" value="{{.rejectReason}}" placeholder="Why? (required) — goes back to the talent" style="flex: 2;" />
+              <button class="btn btn-danger" on-click="@this.rejectNominee(this)">Send the pick back</button>
             </div>
-            <p class="boundary-note" style="margin-top: 0.5rem;">You approve or reject with a reason. You never pick a substitute — that's theirs.</p>
+            <p class="boundary-note" style="margin-top: 0.5rem;">You can say yes, or no with a reason. You never pick for them.</p>
           </article>
         {{/each}}
       {{else}}
-        <div class="empty-state">No cards waiting on your confirmer approval.</div>
+        <div class="empty-state">Nothing waiting for you.</div>
       {{/if}}
     </section>
 
@@ -122,7 +122,7 @@
         {{/each}}
       {{else}}
         <div class="empty-state">
-          Confirmed cards from your reports appear here — counts and statuses only, never a ranking.
+          Confirmed cards from your people show here. Counts only. Never a ranking.
         </div>
       {{/if}}
     </section>

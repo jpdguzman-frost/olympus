@@ -60,11 +60,11 @@ const app = new Ractive({
     this.set({ error: null, notice: null });
     try {
       if (!(row.rulingText || '').trim()) {
-        this.set('error', 'Write the ruling first — it goes on the record.');
+        this.set('error', 'Write your take first — it goes on the record.');
         return;
       }
       await api('POST', `/api/admin/cards/${row._id}/ruling`, { text: row.rulingText });
-      this.set('notice', 'Ruling recorded — guidance, not a verdict. The reviewer re-reviews with it in view.');
+      this.set('notice', 'Saved. Your take guides — it never decides. The reviewer re-checks now.');
       await refresh();
     } catch (err) {
       this.set('error', err.message);
@@ -111,14 +111,14 @@ const app = new Ractive({
     try {
       const labels = this.parseLabelEdit(claim.editLabels);
       if (!Object.keys(labels).length) {
-        this.set('error', 'Write the correction as field: value (comma-separated for several)');
+        this.set('error', 'Write the fix as field: value (comma for more than one)');
         return;
       }
       await api('POST', `/api/admin/calibration/${card._id}/claims/${claim._id}`, {
         action: 'edit',
         labels: { ...claim.labels, ...labels },
       });
-      this.set('notice', 'Correction saved and logged.');
+      this.set('notice', 'Fix saved and logged.');
       await refresh();
     } catch (err) {
       this.set('error', err.message);
@@ -129,7 +129,7 @@ const app = new Ractive({
     this.set({ error: null, notice: null });
     try {
       await api('POST', `/api/admin/calibration/${card._id}/claims/${claim._id}`, { action: 'remove' });
-      this.set('notice', 'Claim removed — logged as a correction.');
+      this.set('notice', 'Line removed and logged.');
       await refresh();
     } catch (err) {
       this.set('error', err.message);
@@ -140,7 +140,7 @@ const app = new Ractive({
     this.set({ error: null, notice: null });
     try {
       await api('POST', `/api/admin/calibration/${card._id}/release`);
-      this.set('notice', `Released “${card.subject.name}” — the talent can now see their claims.`);
+      this.set('notice', `Released “${card.subject.name}” — the talent can now see their lines.`);
       await refresh();
     } catch (err) {
       this.set('error', err.message);

@@ -64,8 +64,8 @@
         </div>
       {{else}}
         <div class="ladder-pending">
-          <span class="meta">READ FROM CONFIRMED EVIDENCE — NEVER ASSIGNED</span>
-          Nothing is on record yet. Your position appears here the moment your first card confirms.
+          <span class="meta">READ FROM YOUR CONFIRMED CARDS — NO ONE SETS THIS BY HAND</span>
+          Nothing here yet. When your first card is confirmed, your level shows up here.
         </div>
       {{/if}}
     </section>
@@ -81,10 +81,10 @@
           </div>
           <div class="record-meta">
             <span class="tag">{{.periodTag}}</span>
-            <span>routed to you</span>
+            <span>sent to you</span>
           </div>
           <div class="record-foot">
-            <span class="muted" style="font-size: var(--text-sm);">Confirm what you saw, or send it back with a note.</span>
+            <span class="muted" style="font-size: var(--text-sm);">Did you see this work? Say yes, or send it back with a note.</span>
             <span class="spacer"></span>
             <button class="btn btn-primary" on-click="@this.openCard(._id)">Review</button>
           </div>
@@ -112,7 +112,7 @@
           </article>
         {{/each}}
       {{else}}
-        <div class="empty-state">Nothing on record yet. Confirmed cards land here with their stamp.</div>
+        <div class="empty-state">Nothing here yet. When a card is confirmed, it lands here.</div>
       {{/if}}
     </section>
 
@@ -131,7 +131,7 @@
             <div class="record-meta">
               {{#if .periodTag}}<span class="tag">{{.periodTag}}</span>{{/if}}
               <span>{{answeredCount(this)}} of 4 answered</span>
-              {{#if .submittedForStructuringAt}}<span>sent for structuring</span>{{/if}}
+              {{#if .submittedForStructuringAt}}<span>sent — being read</span>{{/if}}
             </div>
             <div class="record-foot">
               <span class="spacer"></span>
@@ -142,7 +142,7 @@
         {{/each}}
       {{else}}
         <div class="empty-state">
-          No open drafts. Start a card — four questions about real work, minutes not hours, any language.
+          No open drafts. Start a card. Four questions, a few minutes, any language.
         </div>
       {{/if}}
     </section>
@@ -175,7 +175,7 @@
             </div>
             <div class="record-meta">
               <span class="tag">{{.periodTag}}</span>
-              {{#if .inCalibration}}<span>in calibration with JP</span>{{else}}<span>{{.claims.length}} drafted claims</span>{{/if}}
+              {{#if .inCalibration}}<span>with JP for a first check</span>{{else}}<span>{{.claims.length}} lines drafted</span>{{/if}}
             </div>
             <div class="record-foot">
               <span class="spacer"></span>

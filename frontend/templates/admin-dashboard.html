@@ -19,7 +19,7 @@
 
     <div class="capture-head"><h1>Administration</h1></div>
     <p class="muted" style="font-size: var(--text-sm); margin-bottom: 1rem;">
-      Users, tracks, and the audit trail. Verdicts are not writable here — by anyone, including you.
+      Users, tracks, and the log. No one writes verdicts here — not even you.
     </p>
 
     <section>
@@ -30,13 +30,13 @@
           {{#if .vocabPackVersion}}
             <span class="meta">Vocabulary pack {{.vocabPackVersion}}{{#if .packMode === 'vocab-only'}} · vocab-only{{/if}}</span>
           {{else}}
-            <span class="pending">NO VOCABULARY PACK LOADED — structuring (P3) waits on it</span>
+            <span class="pending">NO PACK LOADED — cards wait until one is in</span>
           {{/if}}
           {{#if .packMode === 'vocab-only'}}
             {{#if .behaviorSpecVersion}}
               <span class="meta"> · behavior spec {{.behaviorSpecVersion}}</span>
             {{else}}
-              <span class="pending">NO BEHAVIOR SPEC PUBLISHED — split-mode structuring waits on it</span>
+              <span class="pending">NO BEHAVIOR SPEC — cards wait until it is in</span>
             {{/if}}
           {{/if}}
           <div class="record-meta" style="margin-top: 0.5rem;">
@@ -45,7 +45,7 @@
           </div>
           <div class="form-row" style="margin-top: 0.75rem;">
             <label class="field">
-              <span class="field-name">Fallback reviewer (verdict SLA escalation)</span>
+              <span class="field-name">Backup reviewer (gets stuck cards)</span>
               <select value="{{.fallbackReviewerId}}">
                 <option value="">not set</option>
                 {{#each ~/activeUsers}}
@@ -54,7 +54,7 @@
               </select>
             </label>
             <label class="field">
-              <span class="field-name">Exposure verifier (nomination sign-off)</span>
+              <span class="field-name">Exposure checker (signs off picks)</span>
               <select value="{{.exposureVerifierId}}">
                 <option value="">not set</option>
                 {{#each ~/activeUsers}}
@@ -65,7 +65,7 @@
             <button class="btn btn-secondary" style="align-self: flex-end;" on-click="@this.saveSettings(this)">Save settings</button>
           </div>
           <p class="muted" style="font-size: var(--text-xs); margin-top: 0.4rem;">
-            Role settings, not code — read at use time. A fallback reviewer is never assigned to a card where they are the talent, the nominee, or a party to the deadlock.
+            Set here, not in code. A backup reviewer never gets a card where they are the talent, the pick, or part of the disagreement.
           </p>
         </div>
       {{/each}}
@@ -92,16 +92,16 @@
                   <td><button class="btn btn-quiet" on-click="@this.nudgeCard(this)">Nudge</button></td>
                 </tr>
                 {{#if .escalationHalted}}
-                  <tr><td colspan="8"><span class="pending">ESCALATION HALTED — {{.escalationHalted.reason}}. Fix the track's fallback setting, or resolve by hand.</span></td></tr>
+                  <tr><td colspan="8"><span class="pending">STUCK — {{.escalationHalted.reason}}. Fix the backup-reviewer setting, or sort it by hand.</span></td></tr>
                 {{/if}}
                 {{#if .status === 'deadlocked'}}
                   <tr>
                     <td colspan="8">
                       <div class="sweep-actions" style="flex-wrap: wrap;">
                         <span class="muted" style="font-size: var(--text-xs); width: 100%;">
-                          Both final positions are in the card's audit trail. Your ruling is guidance on the record — never a verdict; the reviewer re-reviews with it in view.
+                          Both sides are saved in the card's log. Your ruling guides — it never decides. The reviewer re-checks with it in view.
                         </span>
-                        <input type="text" value="{{.rulingText}}" placeholder="Your ruling, one or two lines" style="flex: 2;" />
+                        <input type="text" value="{{.rulingText}}" placeholder="Your take, one or two lines" style="flex: 2;" />
                         <button class="btn btn-primary" on-click="@this.sendRuling(this)">Write ruling</button>
                       </div>
                     </td>
@@ -112,7 +112,7 @@
           </table>
         </div>
         <p class="muted" style="font-size: var(--text-xs); margin-top: 0.5rem;">
-          SLA: 10 working days, two automatic chases, then escalation to the track's fallback reviewer. Non-response is never a verdict.
+          Rule: 10 working days. Two auto reminders, then the card moves to the backup reviewer. Silence never becomes a verdict.
         </p>
       {{else}}
         <div class="empty-state">Nothing pending a verdict.</div>
@@ -143,7 +143,7 @@
                 </div>
                 <p class="verbatim">“{{.sourceQuote}}”</p>
                 <div class="sweep-actions">
-                  <input type="text" value="{{.editLabels}}" placeholder='corrections e.g. execution: I run it'
+                  <input type="text" value="{{.editLabels}}" placeholder='fixes, e.g. execution: I run it'
                     style="flex: 2; font-family: var(--mono); font-size: var(--text-xs);" />
                   <button class="btn btn-secondary" on-click="@this.correctClaim(../../this, this)">Save correction</button>
                   <button class="btn btn-danger" on-click="@this.removeClaim(../../this, this)">Remove claim</button>
@@ -152,7 +152,7 @@
             {{/each}}
 
             <div class="record-foot">
-              <span class="muted" style="font-size: var(--text-xs);">Corrections are validated against the pack and logged.</span>
+              <span class="muted" style="font-size: var(--text-xs);">Fixes are checked against the pack and logged.</span>
               <span class="spacer"></span>
               <button class="btn btn-primary" on-click="@this.releaseCard(this)">Release to talent</button>
             </div>
@@ -160,7 +160,7 @@
         {{/each}}
       {{else}}
         <div class="empty-state">
-          Nothing waiting. Structured cards hold here while calibration mode is on — five consecutive clean cards across three talents per track is your exit gate.
+          Nothing waiting. While calibration is on, new cards stop here first. Five clean cards in a row, across three talents, ends calibration.
         </div>
       {{/if}}
     </section>
@@ -258,7 +258,7 @@
         </table>
       </div>
       <p class="muted" style="font-size: var(--text-xs); margin-top: 0.5rem;">
-        Append-only. Entries are never edited and never deleted.
+        Write-once. Never edited, never deleted.
       </p>
     </section>
   </main>

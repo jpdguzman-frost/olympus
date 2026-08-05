@@ -10,19 +10,19 @@
 
   {{#if card.createdViaShellBy}}
     <p class="capture-shell-note">
-      Your lead opened this shell — the {{card.subject.kind}} name and close date only. Everything below is yours.
+      Your lead started this card with just the name and the date. Everything else is yours to write.
     </p>
   {{/if}}
 
   {{#if context.length}}
     <div class="context-strip">
-      <div class="context-title">Previously on record — reference only</div>
+      <div class="context-title">Your past cards — just for reference</div>
       <ul>
         {{#each context}}
           <li><strong>{{.subject.name}}</strong> <span class="meta">{{.periodTag}} · {{.claims.length}} claims confirmed</span></li>
         {{/each}}
       </ul>
-      <div class="note">Nothing copies into your answers. New evidence comes only from what you write now.</div>
+      <div class="note">Nothing is copied in. Only what you write now counts.</div>
     </div>
   {{/if}}
 
@@ -34,7 +34,7 @@
     <label class="field">
       <span class="field-name">Close date</span>
       <input type="date" value="{{closeDateStr}}" />
-      {{#if card.periodTag}}<span class="field-hint">Files under <strong>{{card.periodTag}}</strong> — the quarter it closed, no matter when you file.</span>{{/if}}
+      {{#if card.periodTag}}<span class="field-hint">Counts under <strong>{{card.periodTag}}</strong> — the quarter the work ended.</span>{{/if}}
     </label>
   </div>
 
@@ -47,11 +47,11 @@
       </div>
     {{/each}}
   </div>
-  <p class="any-language">Answer in any language — English, Filipino, Taglish, whatever tells it best.</p>
+  <p class="any-language">Answer in any language — English, Filipino, Taglish. Whatever tells it best.</p>
 
   <div class="mode-toggle" role="group" aria-label="Answer mode">
     <button class="{{#if mode === 'guided'}}active{{/if}}" on-click="@this.setMode('guided')">Guided — one at a time</button>
-    <button class="{{#if mode === 'single-pass'}}active{{/if}}" on-click="@this.setMode('single-pass')">Single pass — tell it in one go</button>
+    <button class="{{#if mode === 'single-pass'}}active{{/if}}" on-click="@this.setMode('single-pass')">One go — tell it all at once</button>
   </div>
 
   {{#if mode === 'guided'}}
@@ -71,23 +71,23 @@
     <div class="question-block">
       <div class="question-text">All four, in one go</div>
       <textarea value="{{singleText}}" rows="10" style="min-height: 14rem;"
-        placeholder="Tell it the way you'd tell a teammate — cover the four questions above as you go."></textarea>
+        placeholder="Write it like you'd tell a teammate. Just cover the four questions."></textarea>
     </div>
   {{/if}}
 
   {{#if sweepVisible}}
     <div class="sweep-panel">
-      <h2>One last sweep</h2>
+      <h2>One last thing</h2>
       <p class="sweep-hint">
-        Anything else you own on this {{card.subject.kind}} that didn't come up?
-        “Not me” is a perfectly good answer — it costs you nothing.
+        Anything else you own here that didn't come up?
+        “Not me” is a fine answer. It costs you nothing.
         {{#if !track.competencyOrDomainList.length}}
-          <br /><span class="meta">The full coverage checklist arrives with the vocabulary pack.</span>
+          <br /><span class="meta">The full checklist shows up once the pack is loaded.</span>
         {{/if}}
       </p>
-      <textarea value="{{sweepText}}" placeholder="Anything unmentioned — or “not me”"></textarea>
+      <textarea value="{{sweepText}}" placeholder="Anything else — or “not me”"></textarea>
       <div class="sweep-actions">
-        <button class="btn btn-secondary" on-click="@this.notMe()">Nothing else — not me for the rest</button>
+        <button class="btn btn-secondary" on-click="@this.notMe()">Nothing else — not me</button>
       </div>
     </div>
   {{/if}}
@@ -101,9 +101,9 @@
 
   <div class="submit-bar">
     <span class="muted" style="font-size: var(--text-sm);">
-      Your words save as you type. Structuring drafts claims from them — you approve every line before anything routes.
+      Your words save as you type. The app turns them into lines. You check every line before anything moves.
     </span>
     <span class="spacer"></span>
-    <button class="btn btn-primary" on-click="@this.submitCard()" disabled="{{!canSubmit}}">Send for structuring</button>
+    <button class="btn btn-primary" on-click="@this.submitCard()" disabled="{{!canSubmit}}">Send it in</button>
   </div>
 </script>

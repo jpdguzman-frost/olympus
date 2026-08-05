@@ -10,12 +10,12 @@
     {{#if card.periodTag}}<span class="tag">{{card.periodTag}}</span>{{/if}}
     <span>{{card.subject.kind}}</span>
     {{#if card.packVersion}}<span>pack {{card.packVersion}}</span>{{/if}}
-    {{#if card.stale}}<span class="tag" style="color: var(--amber-ink);">STALE — filed 60+ days after close; context, never a block</span>{{/if}}
+    {{#if card.stale}}<span class="tag" style="color: var(--amber-ink);">STALE — filed late, long after the work ended. Context only, never a block</span>{{/if}}
   </div>
 
   {{#if card.inCalibration}}
     <div class="banner banner-info">
-      JP is calibrating this card. Your claims appear here once released — your words below are already on record.
+      JP is giving this card a first check. Your lines show up here after that. Your words below are already saved.
     </div>
   {{/if}}
 
@@ -25,32 +25,32 @@
   {{#if isConfirmScreen}}
     <div class="banner banner-info">
       {{#if card.status === 'adjust'}}
-        Your reviewer sent this back. Fix or re-approve the noted lines, then send it back for review.
+        Your reviewer sent this back. Read their notes. Fix each line, or stand by it. Then send it back.
       {{else}}
-        These are drafted claims from your words. Approve each line, or fix it — nothing routes until every line is yours.
+        We turned your words into these lines. Check each one. Say yes if it's right, fix it if it's not. Nothing moves until every line is yours.
       {{/if}}
     </div>
   {{/if}}
 
   {{#if isReviewScreen}}
     <div class="banner banner-info">
-      You were named by {{card.talentName || 'the talent'}} as exposed to this work. Confirm each claim against the quote,
-      or send it back with a note. Confirmed is the only accepting answer.
-      When this person's area needed a decision, who made the call — don't round up.
+      {{card.talentName || 'The talent'}} picked you because you saw this work. Check each line against their words.
+      True? Confirm it. Not true? Send it back with a note.
+      And when their area needed a decision — who really made the call? Don't round up.
     </div>
   {{/if}}
 
   {{#if card.status === 'deadlocked'}}
     <div class="banner banner-warn">
-      Deadlock: the defence and the reviewer's position are both on the record. JP reviews both and writes a ruling —
-      guidance, never a verdict. The verdict stays the reviewer's alone.
+      You and your reviewer see this differently. Both sides are saved. JP will read both and give guidance.
+      The final call still belongs to the reviewer.
     </div>
   {{/if}}
 
   {{#if card.ruling}}
     <div class="banner banner-info">
-      <strong>JP's ruling, on the record:</strong> “{{card.ruling.text}}”
-      <span class="meta"> — guidance for the reviewer; the verdict remains theirs.</span>
+      <strong>JP's take, on the record:</strong> “{{card.ruling.text}}”
+      <span class="meta"> — this is guidance. The reviewer still makes the call.</span>
     </div>
   {{/if}}
 
@@ -84,12 +84,12 @@
           {{/if}}
           {{#if .defenseStatement}}
             <div class="banner banner-info" style="margin: 0.6rem 0 0;">
-              Talent's defence, on the record: “{{.defenseStatement}}”
+              The talent stands by this line: “{{.defenseStatement}}”
             </div>
           {{/if}}
           {{#if .concessionReason}}
             <p class="muted" style="font-size: var(--text-sm); margin-top: 0.4rem;">
-              Conceded after defence: {{.concessionReason}}
+              Changed after standing by it. Why: {{.concessionReason}}
             </p>
           {{/if}}
 
@@ -108,21 +108,21 @@
                   </label>
                 {{/each}}
                 {{#if .defenseStatement}}
-                  <input type="text" value="{{.concessionText}}" placeholder="You defended this line — why change it now? (required, on the record)" style="flex: 2; min-width: 100%;" />
+                  <input type="text" value="{{.concessionText}}" placeholder="You stood by this line before. Why change it now? (required)" style="flex: 2; min-width: 100%;" />
                 {{/if}}
                 <button class="btn btn-primary" on-click="@this.saveFix(this, ci)">Save fix</button>
                 <button class="btn btn-quiet" on-click="@this.set('card.claims.' + ci + '.editing', false)">Cancel</button>
               </div>
             {{else}}
               <div class="sweep-actions" style="flex-wrap: wrap;">
-                <button class="btn btn-primary" on-click="@this.approveClaim(this)">Approve — this is mine</button>
-                <button class="btn btn-secondary" on-click="@this.startFix(this, ci)">Fix the labels</button>
+                <button class="btn btn-primary" on-click="@this.approveClaim(this)">Yes — this is mine</button>
+                <button class="btn btn-secondary" on-click="@this.startFix(this, ci)">Fix it</button>
                 <button class="btn btn-danger" on-click="@this.removeClaim(this)">Not mine — remove</button>
               </div>
               {{#if card.status === 'adjust' && .verdict === 'Adjust' && !.defenseStatement}}
                 <div class="sweep-actions" style="margin-top: 0.4rem;">
-                  <input type="text" value="{{.defenseText}}" placeholder="Or stand by it as written — say why, on the record" style="flex: 2;" />
-                  <button class="btn btn-secondary" on-click="@this.defendClaim(this)">Defend — it stands</button>
+                  <input type="text" value="{{.defenseText}}" placeholder="Or keep it as is — say why" style="flex: 2;" />
+                  <button class="btn btn-secondary" on-click="@this.defendClaim(this)">It stands — keep it</button>
                 </div>
               {{/if}}
             {{/if}}
@@ -130,12 +130,12 @@
 
           {{#if isReviewScreen && !.verdict}}
             <div class="sweep-actions" style="flex-wrap: wrap;">
-              <input type="text" value="{{.attestation}}" placeholder="What did you check? (one line, required to confirm)" style="flex: 2;" />
+              <input type="text" value="{{.attestation}}" placeholder="What did you check? (one line, needed to confirm)" style="flex: 2;" />
               <button class="btn btn-primary" on-click="@this.sendVerdict(this, 'Confirmed')">Confirmed — I checked this</button>
             </div>
             <div class="sweep-actions" style="margin-top: 0.4rem;">
-              <input type="text" value="{{.adjustNote}}" placeholder="What doesn't match what you saw? (required for Adjust)" style="flex: 2;" />
-              <button class="btn btn-danger" on-click="@this.sendVerdict(this, 'Adjust')">Adjust</button>
+              <input type="text" value="{{.adjustNote}}" placeholder="What doesn't match what you saw? (needed to send back)" style="flex: 2;" />
+              <button class="btn btn-danger" on-click="@this.sendVerdict(this, 'Adjust')">Send back (Adjust)</button>
             </div>
           {{/if}}
         </article>
@@ -149,7 +149,7 @@
       {{#each card.followUps}}
         <div class="sweep-panel">
           <p style="margin-bottom: 0.5rem;">{{.question}}</p>
-          <textarea value="{{.answer}}" placeholder="In your own words — “not me” costs nothing"></textarea>
+          <textarea value="{{.answer}}" placeholder="In your own words — “not me” is fine"></textarea>
           <div class="sweep-actions">
             <button class="btn btn-secondary" on-click="@this.answerFollowUp(this)">Save answer</button>
           </div>
@@ -161,21 +161,20 @@
   {{#if isConfirmScreen && card.status === 'structured'}}
     <div class="submit-bar">
       <span class="muted" style="font-size: var(--text-sm);">
-        {{approvedCount}} of {{card.claims.length}} lines approved.
+        {{approvedCount}} of {{card.claims.length}} lines are yours.
       </span>
       <span class="spacer"></span>
       <button class="btn btn-primary" on-click="@this.openNomination()" disabled="{{approvedCount < card.claims.length || !card.claims.length}}">
-        Approve all — choose confirmers
+        All good — pick who confirms
       </button>
     </div>
 
     {{#if nominating}}
       <section>
-        <div class="section-label">Nominate 1–2 confirmers</div>
+        <div class="section-label">Pick who confirms this</div>
         <div class="shell-form">
           <p class="muted" style="font-size: var(--text-sm); margin-bottom: 0.75rem;">
-            Someone exposed to this work — not your Lead. Your Lead approves the exposure; they can reject
-            with a reason, but they can never swap in their own pick.
+            Pick someone who saw this work. Not your lead. No one can swap in a different pick — only you choose.
           </p>
           {{#each candidates}}
             <label style="display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0; font-size: var(--text-sm);">
@@ -184,8 +183,8 @@
             </label>
           {{/each}}
           <div class="sweep-actions" style="margin-top: 0.75rem;">
-            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick.length || nomineePick.length > 2}}">Send to my Lead</button>
-            <button class="btn btn-secondary" on-click="@this.submitThinPool()">No valid confirmer exists — use the fallback path</button>
+            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick.length || nomineePick.length > 2}}">Send my pick</button>
+            <button class="btn btn-secondary" on-click="@this.submitThinPool()">No one fits — use the backup path</button>
           </div>
         </div>
       </section>
@@ -194,7 +193,7 @@
 
   {{#if isConfirmScreen && card.status === 'adjust'}}
     <div class="submit-bar">
-      <span class="muted" style="font-size: var(--text-sm);">Fix, re-approve, or defend the returned lines, then send it back.</span>
+      <span class="muted" style="font-size: var(--text-sm);">Fix the lines, or stand by them. Then send it back.</span>
       <span class="spacer"></span>
       <button class="btn btn-primary" on-click="@this.rerouteCard()">Send back for review</button>
     </div>
@@ -203,22 +202,22 @@
   {{#if isReviewScreen && card.status === 'ruled'}}
     <div class="submit-bar" style="flex-wrap: wrap;">
       <span class="muted" style="font-size: var(--text-sm);">
-        Re-review with the ruling in view. If you now agree, write your verdicts above — they stay yours alone.
-        If you still can't, state your final position; the card goes to the fallback reviewer.
+        Read JP's take above, then check the lines again. If you agree now, write your call above — it is still yours alone.
+        If you still can't, say your final word here. The card then goes to a backup reviewer.
       </span>
-      <input type="text" value="{{refuseText}}" placeholder="Your final position (required, logged permanently)" style="flex: 2;" />
+      <input type="text" value="{{refuseText}}" placeholder="Your final word (required — saved for good)" style="flex: 2;" />
       <button class="btn btn-danger" on-click="@this.refuseRuling()">I still can't confirm this</button>
     </div>
   {{/if}}
 
   {{#if card.nomination && card.nomination.leadDecision && card.nomination.leadDecision.action === 'reject' && card.status === 'talent-approved'}}
     <div class="banner banner-warn">
-      Your Lead returned your pick: “{{card.nomination.leadDecision.reason}}” — nominate someone else.
+      Your lead sent your pick back: “{{card.nomination.leadDecision.reason}}” Pick someone else.
     </div>
-    <button class="btn btn-primary" on-click="@this.openNomination()">Choose confirmers</button>
+    <button class="btn btn-primary" on-click="@this.openNomination()">Pick someone</button>
     {{#if nominating}}
       <section>
-        <div class="section-label">Nominate 1–2 confirmers</div>
+        <div class="section-label">Pick who confirms this</div>
         <div class="shell-form">
           {{#each candidates}}
             <label style="display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0; font-size: var(--text-sm);">
@@ -227,7 +226,7 @@
             </label>
           {{/each}}
           <div class="sweep-actions" style="margin-top: 0.75rem;">
-            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick.length || nomineePick.length > 2}}">Send to my Lead</button>
+            <button class="btn btn-primary" on-click="@this.submitNomination()" disabled="{{!nomineePick.length || nomineePick.length > 2}}">Send my pick</button>
           </div>
         </div>
       </section>
@@ -235,7 +234,7 @@
   {{/if}}
 
   <section>
-    <div class="section-label">The words, on record</div>
+    <div class="section-label">Your words, on record</div>
     {{#each card.rawAnswers}}
       <div class="question-block">
         {{#if .questionIndex !== null}}<span class="question-number">{{.questionIndex + 1}} / 4</span>{{/if}}

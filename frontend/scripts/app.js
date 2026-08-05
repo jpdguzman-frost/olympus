@@ -98,7 +98,7 @@ const app = new Ractive({
       if (result.structuring === 'pending-p3') {
         this.set(
           'submitMessage',
-          'On record. Your words are saved — structuring picks this card up within a minute.',
+          'Saved. Your words are on record. In about a minute the app turns them into lines for you to check.',
         );
       }
     } catch (err) {
@@ -146,7 +146,7 @@ const app = new Ractive({
       await api('POST', `/api/cards/${this.get('card._id')}/refuse-ruling`, {
         statement: this.get('refuseText'),
       });
-      this.set('notice', 'Your final position is on the record. The card moved on without your verdict being written for you.');
+      this.set('notice', 'Your final word is saved. The card goes to a backup reviewer. No one writes a call in your name.');
       await this.refreshDetail();
     } catch (err) {
       this.set('actionError', err.message);
@@ -169,7 +169,7 @@ const app = new Ractive({
       await api('POST', `/api/cards/${this.get('card._id')}/follow-ups/${followUp._id}/answer`, {
         answer: followUp.answer,
       });
-      this.set('notice', 'Answer saved with your words.');
+      this.set('notice', 'Answer saved.');
     } catch (err) {
       this.set('actionError', err.message);
     }
@@ -195,7 +195,7 @@ const app = new Ractive({
       await api('POST', `/api/cards/${this.get('card._id')}/nominate`, {
         nomineeIds: this.get('nomineePick'),
       });
-      this.set({ nominating: false, notice: 'Sent to your Lead for exposure approval.' });
+      this.set({ nominating: false, notice: 'Your pick is in. It goes to your lead next.' });
       await this.refreshDetail();
     } catch (err) {
       const failures = err.failures?.map((f) => `${f.nominee}: ${f.reason}`).join(' · ');
@@ -207,7 +207,7 @@ const app = new Ractive({
     this.set({ notice: null, actionError: null });
     try {
       await api('POST', `/api/cards/${this.get('card._id')}/nominate`, { thinPool: true });
-      this.set({ nominating: false, notice: 'Routed through the fallback path, visibly marked.' });
+      this.set({ nominating: false, notice: 'Sent through the backup path — marked so everyone can see.' });
       await this.refreshDetail();
     } catch (err) {
       this.set('actionError', err.message);
@@ -374,7 +374,7 @@ async function saveNow() {
     app.set('saveState', 'saved');
   } catch (err) {
     app.set('saveState', 'idle');
-    app.set('error', `Autosave failed: ${err.message} — your text is still in this page; try again.`);
+    app.set('error', `Saving failed: ${err.message} — your text is still here. Try again.`);
     throw err;
   }
 }
