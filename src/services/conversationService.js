@@ -64,29 +64,15 @@ function turnSchema() {
   };
 }
 
-function renderConversationInput(card, capsScaffold, summary, aiQuestionsUsed) {
-  const parts = [
-    `SUBJECT (${card.subject.kind}): ${card.subject.name || 'not named yet'}`,
-    `CLOSE DATE: ${card.closeDate ? card.closeDate.toISOString().slice(0, 10) : 'not set'}`,
-  ];
-  if (summary) {
-    parts.push('', 'ACTIVITY SUMMARY (from CAPS — memory scaffold, never evidence):', summary);
-  } else if (capsScaffold?.tasks?.length) {
-    parts.push(
-      '',
-      'CAPS MEMORY SCAFFOLD (context only — NEVER evidence):',
-      ...capsScaffold.tasks.slice(0, 40).map(
-        (t) => `- ${t.date ? t.date.toISOString().slice(0, 10) : ''} · ${t.category ?? ''} · ${t.taskName}`,
-      ),
-    );
-  }
-  parts.push('', 'THE CONVERSATION SO FAR:');
-  if (!card.conversation.length) parts.push('(none — you open it)');
-  for (const turn of card.conversation) {
-    parts.push(`${turn.role === 'ai' ? 'YOU' : 'TALENT'}: ${turn.text}`);
-  }
-  parts.push(
-    '',
+/**
+ * Prompt-cache-friendly layout: everything stable per card (frame,
+ * summary, scaffold) comes FIRST as one block; the transcript grows
+ * append-only in the second block; the per-turn counter rides at the
+ * very tail. Cache breakpoints on the stable block and the transcript
+ * mean each turn re-reads the previous turn's prefix from cache.
+ */
+function renderConversationBlocks(card, capsScaffold, summary, aiQuestionsUsed) {
+  const stable = [
     'YOUR TASK — the capture conversation (mechanical frame; your rules govern the substance):',
     'You are running the talent-facing capture as a conversation, ONE message at a time.',
     'The four fixed questions are your invisible skeleton — cover their INTENT, never read them out:',
@@ -100,7 +86,6 @@ function renderConversationInput(card, capsScaffold, summary, aiQuestionsUsed) {
     'upgrade elements (moment, alternative, trace) when something reads above its anchor.',
     'Stay within your question budget. Never state a level, a score, or a reading. Never interrogate;',
     'a vague answer is noted, not chased past your budget.',
-    `You have used ${aiQuestionsUsed} of ${MAX_AI_QUESTIONS} questions (a ceiling, not a goal).`,
     'When the skeleton is covered (or the budget is spent), kind="sweep": ONE compact message asking',
     'what else they own here that has not come up — remind them "not me" costs nothing, and that a',
     'yes needs one detail (what, where, since when). After their sweep answer (with one detail invite',
@@ -111,8 +96,38 @@ function renderConversationInput(card, capsScaffold, summary, aiQuestionsUsed) {
     'needed to place it, then wrap again briefly. Their latest words always win over earlier ones.',
     'VOICE: English. Approachable yet professional. Simple words. No hype. Neutral.',
     'Output only the schema.',
-  );
-  return parts.join('\n');
+    '',
+    `SUBJECT (${card.subject.kind}): ${card.subject.name || 'not named yet'}`,
+    `CLOSE DATE: ${card.closeDate ? card.closeDate.toISOString().slice(0, 10) : 'not set'}`,
+  ];
+  if (summary) {
+    stable.push('', 'ACTIVITY SUMMARY (from CAPS — memory scaffold, never evidence):', summary);
+  } else if (capsScaffold?.tasks?.length) {
+    stable.push(
+      '',
+      'CAPS MEMORY SCAFFOLD (context only — NEVER evidence):',
+      ...capsScaffold.tasks.slice(0, 40).map(
+        (t) => `- ${t.date ? t.date.toISOString().slice(0, 10) : ''} · ${t.category ?? ''} · ${t.taskName}`,
+      ),
+    );
+  }
+
+  const transcript = ['', 'THE CONVERSATION SO FAR:'];
+  if (!card.conversation.length) transcript.push('(none — you open it)');
+  for (const turn of card.conversation) {
+    transcript.push(`${turn.role === 'ai' ? 'YOU' : 'TALENT'}: ${turn.text}`);
+  }
+
+  const tail = [
+    '',
+    `You have used ${aiQuestionsUsed} of ${MAX_AI_QUESTIONS} questions (a ceiling, not a goal). Respond now.`,
+  ];
+
+  return [
+    { type: 'text', text: stable.join('\n'), cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: transcript.join('\n'), cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: tail.join('\n') },
+  ];
 }
 
 /**
@@ -136,8 +151,11 @@ export async function nextTurn(track, card, { client = getClient(), capsScaffold
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 2000,
-    system: composeSystemPrompt(track),
-    messages: [{ role: 'user', content: renderConversationInput(card, capsScaffold, summary, aiQuestionsUsed) }],
+    // Prompt caching: the system prompt (behavior spec + pack) is
+    // identical every turn — cached; the user prefix re-reads from the
+    // previous turn's breakpoint.
+    system: [{ type: 'text', text: composeSystemPrompt(track), cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: renderConversationBlocks(card, capsScaffold, summary, aiQuestionsUsed) }],
     output_config: { format: { type: 'json_schema', schema: turnSchema() } },
   });
 

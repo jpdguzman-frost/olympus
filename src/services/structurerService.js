@@ -228,7 +228,9 @@ export async function structureCard(track, card, { client = getClient(), capsSca
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 16000,
-    system: composeSystemPrompt(track),
+    // Prompt caching: the pack+behavior system prompt is identical for
+    // every card on the track.
+    system: [{ type: 'text', text: composeSystemPrompt(track), cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: renderCardInput(card, capsScaffold) }],
     output_config: { format: { type: 'json_schema', schema: buildOutputSchema(track) } },
   });
@@ -406,7 +408,7 @@ export async function remapClaim(track, card, claim, contentionText, { client = 
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 8000,
-    system: composeSystemPrompt(track),
+    system: [{ type: 'text', text: composeSystemPrompt(track), cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userContent }],
     output_config: { format: { type: 'json_schema', schema } },
   });

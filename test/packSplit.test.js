@@ -107,7 +107,9 @@ describe('System prompt composition (A7)', () => {
     const track = await Track.findOne({ key: 'ops' });
     const capture = {};
     await structureCard(track, CARD_STUB, { client: fakeClient(capture) });
-    const system = capture.params.system;
+    // system is a cached block array now (prompt caching); the text is block 0
+    const system = capture.params.system[0].text;
+    expect(capture.params.system[0].cache_control).toEqual({ type: 'ephemeral' });
     expect(system).toContain('BEHAVIOR RULES FROM STORE');
     expect(system).toContain('## SECTION B');
     expect(system.indexOf('BEHAVIOR RULES FROM STORE')).toBeLessThan(system.indexOf('## SECTION B'));
