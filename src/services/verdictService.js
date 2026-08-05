@@ -113,13 +113,13 @@ export async function escalateToFallback(card, kind, actorId = null) {
   const fallback = fallbackId ? await User.findById(fallbackId) : null;
 
   const excludedBecause = !fallback || !fallback.active
-    ? 'no fallback reviewer is set for this track (OD-2 setting)'
+    ? 'no one is set to take over on this track yet — set it under Tracks'
     : fallback._id.equals(card.talentId)
-      ? 'the fallback reviewer is the card\'s talent'
+      ? 'the person set to take over is this card\'s talent'
       : card.nomination.routedTo?.equals?.(fallback._id)
-        ? 'the fallback reviewer is a party to this deadlock'
+        ? 'the person set to take over is already one side of this disagreement'
         : card.nomination.nominees.some((n) => n.userId?.equals?.(fallback._id))
-          ? 'the fallback reviewer is a nominee on this card'
+          ? 'the person set to take over is the talent\'s pick on this card'
           : null;
 
   if (excludedBecause) {

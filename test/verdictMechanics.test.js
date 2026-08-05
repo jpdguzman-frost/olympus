@@ -189,7 +189,7 @@ describe('C1 deadlock machine', () => {
       .send({ statement: 'still no' });
     expect(refused.status).toBe(200);
     expect(refused.body.data.status).toBe('ruled'); // nothing moved
-    expect(refused.body.data.nomination.escalationHalted.reason).toMatch(/party to this deadlock/);
+    expect(refused.body.data.nomination.escalationHalted.reason).toMatch(/one side of this disagreement/);
 
     await agents.admin.patch('/api/admin/tracks/ops/settings').send({ fallbackReviewerId: null });
   });
@@ -211,7 +211,7 @@ describe('A5 SLA worker', () => {
     await runSlaPass({ now });
     let stored = await Card.findById(card._id);
     expect(stored.status).toBe('routed');
-    expect(stored.nomination.escalationHalted.reason).toMatch(/OD-2/);
+    expect(stored.nomination.escalationHalted.reason).toMatch(/no one is set to take over/);
     expect(stored.claims[0].verdict).toBe(null); // never a verdict
 
     // JP fixes the setting; the halt clears manually and the next pass reassigns.

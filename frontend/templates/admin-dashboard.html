@@ -28,15 +28,15 @@
         <div class="pack-panel">
           <h3>{{.label}} <span class="meta">({{.key}})</span></h3>
           {{#if .vocabPackVersion}}
-            <span class="meta">Vocabulary pack {{.vocabPackVersion}}{{#if .packMode === 'vocab-only'}} · vocab-only{{/if}}</span>
+            <span class="meta">Word pack {{.vocabPackVersion}}{{#if .packMode === 'vocab-only'}} · words only{{/if}}</span>
           {{else}}
-            <span class="pending">NO PACK LOADED — cards wait until one is in</span>
+            <span class="pending">No word pack loaded yet — cards wait.</span>
           {{/if}}
           {{#if .packMode === 'vocab-only'}}
             {{#if .behaviorSpecVersion}}
-              <span class="meta"> · behavior spec {{.behaviorSpecVersion}}</span>
+              <span class="meta"> · behavior rules {{.behaviorSpecVersion}}</span>
             {{else}}
-              <span class="pending">NO BEHAVIOR SPEC — cards wait until it is in</span>
+              <span class="pending">No behavior rules loaded yet — cards wait.</span>
             {{/if}}
           {{/if}}
           <div class="record-meta" style="margin-top: 0.5rem;">
@@ -45,27 +45,29 @@
           </div>
           <div class="form-row" style="margin-top: 0.75rem;">
             <label class="field">
-              <span class="field-name">Backup reviewer (gets stuck cards)</span>
+              <span class="field-name">If a review gets stuck, who takes over?</span>
               <select value="{{.fallbackReviewerId}}">
-                <option value="">not set</option>
+                <option value="">no one yet</option>
                 {{#each ~/activeUsers}}
                   <option value="{{._id}}">{{.name}}</option>
                 {{/each}}
               </select>
+              <span class="field-hint">A reviewer goes quiet for 10 work days, or still says no after you weigh in — the card moves to this person.</span>
             </label>
             <label class="field">
-              <span class="field-name">Exposure checker (signs off picks)</span>
+              <span class="field-name">Who confirms a reviewer really saw the work?</span>
               <select value="{{.exposureVerifierId}}">
-                <option value="">not set</option>
+                <option value="">no one yet</option>
                 {{#each ~/activeUsers}}
                   <option value="{{._id}}">{{.name}}</option>
                 {{/each}}
               </select>
+              <span class="field-hint">When the app can't prove it on its own, this person checks and signs off with one line.</span>
             </label>
             <button class="btn btn-secondary" style="align-self: flex-end;" on-click="@this.saveSettings(this)">Save settings</button>
           </div>
           <p class="muted" style="font-size: var(--text-xs); margin-top: 0.4rem;">
-            Set here, not in code. A backup reviewer never gets a card where they are the talent, the pick, or part of the disagreement.
+            Set here, not in code. The person who takes over never gets a card where they are the talent, the pick, or one side of the disagreement.
           </p>
         </div>
       {{/each}}
@@ -77,7 +79,7 @@
         <div class="table-scroll">
           <table class="ledger">
             <thead>
-              <tr><th>Card</th><th>Talent</th><th>Reviewer</th><th>Status</th><th>Aging</th><th>Chases</th><th>Streak</th><th></th></tr>
+              <tr><th>Card</th><th>Talent</th><th>Reviewer</th><th>Status</th><th>Days waiting</th><th>Reminders</th><th>Same-pair streak</th><th></th></tr>
             </thead>
             <tbody>
               {{#each pendingVerdicts}}
@@ -86,13 +88,13 @@
                   <td class="meta">{{.talentName}}</td>
                   <td class="meta">{{.reviewerName}}{{#if .escalated}} <span class="tag">fallback</span>{{/if}}</td>
                   <td class="meta">{{statusLabel(.status)}}</td>
-                  <td class="meta">{{.agingWorkingDays}}wd</td>
+                  <td class="meta">{{.agingWorkingDays}}</td>
                   <td class="meta">{{.chases}}</td>
                   <td class="meta">{{#if .repeatStreak >= 3}}<span style="color: var(--amber-ink);">{{.repeatStreak}}×</span>{{else}}{{.repeatStreak}}×{{/if}}</td>
                   <td><button class="btn btn-quiet" on-click="@this.nudgeCard(this)">Nudge</button></td>
                 </tr>
                 {{#if .escalationHalted}}
-                  <tr><td colspan="8"><span class="pending">STUCK — {{.escalationHalted.reason}}. Fix the backup-reviewer setting, or sort it by hand.</span></td></tr>
+                  <tr><td colspan="8"><span class="pending">STUCK — {{.escalationHalted.reason}}. Fix the “who takes over” setting above, or sort it by hand.</span></td></tr>
                 {{/if}}
                 {{#if .status === 'deadlocked'}}
                   <tr>
@@ -112,10 +114,10 @@
           </table>
         </div>
         <p class="muted" style="font-size: var(--text-xs); margin-top: 0.5rem;">
-          Rule: 10 working days. Two auto reminders, then the card moves to the backup reviewer. Silence never becomes a verdict.
+          Rule: 10 work days. Two auto reminders, then the card moves to the person set above. Silence never becomes a verdict.
         </p>
       {{else}}
-        <div class="empty-state">Nothing pending a verdict.</div>
+        <div class="empty-state">No cards waiting on a reviewer.</div>
       {{/if}}
     </section>
 

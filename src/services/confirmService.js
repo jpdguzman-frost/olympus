@@ -186,7 +186,7 @@ export async function runSystemChecks(actor, card, nomineeUsers) {
       talentId: nominee._id,
       'subject.name': card.subject.name,
     });
-    exposure[nominee.name] = attached ? 'verified' : 'unverified — your Lead judges exposure';
+    exposure[nominee.name] = attached ? 'seen the work — checked' : 'not proven yet — your lead decides';
   }
 
   return { failures, exposure };
@@ -206,7 +206,7 @@ export async function submitNomination(actor, cardId, { nomineeIds = [], thinPoo
     // visibly marked as the exception path. Names are config (OD-2).
     const track = await Track.findOne({ key: card.track });
     if (!track.fallbackReviewerId) {
-      throw conflict('No fallback reviewer is configured for this track yet (OD-2) — ask JP');
+      throw conflict('No backup path is set up for this track yet — ask JP');
     }
     const fallback = await User.findById(track.fallbackReviewerId);
     card.nomination.nominees = [{ userId: fallback._id, name: fallback.name, role: 'fallback reviewer' }];

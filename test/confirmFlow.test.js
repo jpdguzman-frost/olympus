@@ -160,7 +160,7 @@ describe('repeat-reviewer streak (FR-17) and thin pool (FR-15)', () => {
     await talentApproveFixture(card._id, ctx.users.talentA._id);
     const res = await agents.talentA.post(`/api/cards/${card._id}/nominate`).send({ thinPool: true });
     expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/OD-2/);
+    expect(res.body.error).toMatch(/ask JP/);
   });
 
   it('thin pool routes to the configured fallback, visibly marked', async () => {
