@@ -51,7 +51,31 @@ export async function decideClaim(actor, cardId, claimId, { action, labels, remo
     throw badRequest('You defended this claim — changing it now needs a stated reason, on the record');
   }
 
-  if (action === 'approve') {
+  // A4 date anchoring: nothing gets approved without account + date or
+  // period. The talent adds it in their own words; the line is never
+  // blocked, it just stays draft — "needs a date".
+  const approving = ['approve', 'defend'].includes(action) || (action === 'fix' && !remove);
+  if (approving && !claim.anchorText) {
+    throw badRequest('This line needs a date first — say when this was and where (e.g. "JFC, April to June 2026")');
+  }
+
+  if (action === 'anchor') {
+    const text = statement; // the talent's own words: account + date/period
+    if (!text?.trim()) throw badRequest('Say when this was and where — e.g. "JFC, April to June 2026"');
+    claim.anchorText = text.trim();
+    claim.anchorSource = 'talent';
+  } else if (action === 'contest') {
+    // A4 contention loop: the talent points at the traceback and says
+    // what's wrong. The AI re-maps or explains within a minute; the
+    // answer always comes back to the talent. Never final over their
+    // objection.
+    const text = statement;
+    if (!text?.trim()) throw badRequest('Point at your words and say what\'s wrong with the mapping');
+    const open = (claim.contentions || []).find((c) => c.outcome === null);
+    if (open) throw conflict('This line is already being re-checked — the answer lands here shortly');
+    claim.contentions.push({ text: text.trim(), at: new Date(), outcome: null });
+    claim.talentApproved = false;
+  } else if (action === 'approve') {
     claim.talentApproved = true;
   } else if (action === 'defend') {
     // C1: the talent stands by an adjusted claim unchanged. The defence
@@ -72,7 +96,9 @@ export async function decideClaim(actor, cardId, claimId, { action, labels, remo
       card.claims.pull(claimId);
     } else {
       const track = await Track.findOne({ key: card.track });
-      const candidate = { ...before, labels: labels ?? before.labels };
+      // anchor rides through the re-validation unchanged (raw.anchor is
+      // what the validator reads back into anchorText).
+      const candidate = { ...before, labels: labels ?? before.labels, anchor: before.anchorText ?? '' };
       // Invariant 6: the fix re-runs the validation layer; off-vocabulary
       // values are rejected, and the quote stays the talent's words.
       const { claims, rejected } = validateStructuredOutput(track, card, {
@@ -82,7 +108,7 @@ export async function decideClaim(actor, cardId, claimId, { action, labels, remo
       if (!claims.length) {
         throw badRequest(`Fix rejected by the validation layer: ${rejected[0]?.reason ?? 'unknown'}`);
       }
-      Object.assign(claim, claims[0], { talentApproved: true });
+      Object.assign(claim, claims[0], { talentApproved: true, anchorSource: before.anchorSource });
       if (conceding) {
         claim.concessionReason = concessionReason.trim();
         claim.defenseStatement = null; // conceded — a later Adjust is not a deadlock
@@ -90,7 +116,7 @@ export async function decideClaim(actor, cardId, claimId, { action, labels, remo
       }
     }
   } else {
-    throw badRequest('action is approve, fix, or defend');
+    throw badRequest('action is approve, fix, defend, anchor, or contest');
   }
 
   pushCardAudit(card, {

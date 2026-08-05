@@ -119,7 +119,7 @@ decideNomination → signoff, repeatStreak), `constants`,
 `routes/team.js`, `routes/cards.js`, lead + talent frontends,
 permissionMatrix/confirmFlow/statusMachine/visibility tests. Est. 3d.
 
-## B4 — Card mechanics (A4)
+## B4 — Card mechanics (A4) — **DONE Aug 5**
 
 1. **Date anchoring**: per-claim date/period + account anchor;
    unanchored claims cannot be approved for routing — they stay

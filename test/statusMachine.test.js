@@ -28,6 +28,8 @@ describe('card status machine (Plan §3 as amended)', () => {
     ['adjust', 'revised'],
     ['revised', 'routed'],
     ['confirmed', 'archived'],
+    ['draft', 'archived'], // A4: idle drafts archive, never delete
+    ['archived', 'draft'], // A4: revive (service guards: draft archives only)
   ];
 
   it.each(legal)('%s → %s is legal', (from, to) => {
@@ -42,7 +44,6 @@ describe('card status machine (Plan §3 as amended)', () => {
     ['talent-approved', 'lead-nominee-review'], // A1: the lead leg is retired
     ['lead-nominee-review', 'routed'], // the retired state has no legs at all
     ['confirmed', 'draft'], // confirmed never reopens
-    ['archived', 'draft'],
     ['adjust', 'confirmed'], // adjust must go back through the talent
     ['adjust', 'routed'], // ...and re-route only after revision
     ['adjust', 'deadlocked'], // deadlock only fires at verdict time

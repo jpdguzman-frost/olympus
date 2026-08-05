@@ -69,14 +69,20 @@ export async function createDraft(actor, { subjectName = '', closeDate = null, c
  */
 const STALE_MS = 60 * 24 * 60 * 60 * 1000;
 
+const NUDGE_IDLE_MS = 83 * 24 * 60 * 60 * 1000;
+
 export function presentCard(actor, card) {
   const obj = typeof card.toObject === 'function' ? card.toObject() : card;
   // BR-4: filed 60+ days after close carries STALE — context, never a block.
   if (obj.filedDate && obj.closeDate && new Date(obj.filedDate) - new Date(obj.closeDate) > STALE_MS) {
     obj.stale = true;
   }
+  // A4: the one pre-expiry nudge surfaces on home — plain, no blame.
+  if (obj.status === 'draft' && !obj.submittedForStructuringAt && Date.now() - new Date(obj.updatedAt) > NUDGE_IDLE_MS) {
+    obj.archivesSoon = true;
+  }
   if (obj.calibrationHold && !actor.hasRole('admin')) {
-    return { ...obj, claims: [], followUps: [], inCalibration: true };
+    return { ...obj, claims: [], followUps: [], signalsNoted: [], inCalibration: true };
   }
   return obj;
 }
@@ -216,10 +222,34 @@ export async function submitForStructuring(actor, cardId) {
   return { card, structuring: 'pending-p3' };
 }
 
+/**
+ * A4: revive an archived draft. Only cards archived FROM draft come
+ * back — a confirmed card's archive is permanent record, not a parking
+ * spot. Raw answers were never touched (Invariant 15).
+ */
+export async function reviveCard(actor, cardId) {
+  const card = await Card.findById(cardId);
+  if (!card) throw notFound('Card not found');
+  assertOwnCard(actor, card);
+  if (!actor.hasRole('talent')) throw forbidden('Only talent can revive their card');
+  if (card.status !== 'archived') throw conflict(`Card is not archived (status "${card.status}")`);
+  if (card.archivedFrom !== 'draft') {
+    throw conflict('Only archived drafts revive — a confirmed card stays on the record as it is');
+  }
+
+  card.archivedFrom = null;
+  card.archiveNudgeAt = null;
+  pushCardAudit(card, { by: actor._id, action: 'draft-revived' });
+  await transition(card, 'draft', actor._id, 'revived from archive — nothing was lost');
+  await card.save();
+  await recordAudit({ actorId: actor._id, action: 'card.draft-revived', entity: 'card', entityId: card._id });
+  return card;
+}
+
 // ---------------------------------------------------------------------------
 // Nomination lives in confirmService (P4): talent tags via submitNomination
-// with FR-13 system checks; lead selects-or-rejects via decideNomination.
-// NOBODY substitutes (Invariant 4).
+// with FR-13 system checks; the exposure verifier signs off via
+// decideSignoff. NOBODY substitutes (Invariant 4).
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------

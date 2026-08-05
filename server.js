@@ -20,6 +20,7 @@ import { connectMongo, disconnectMongo } from './src/db/mongo.js';
 import { seedIfNeeded } from './src/services/seedService.js';
 import { startStructurerWorker, stopStructurerWorker } from './src/workers/structurerWorker.js';
 import { startSlaWorker, stopSlaWorker } from './src/workers/slaWorker.js';
+import { startLifecycleWorker, stopLifecycleWorker } from './src/workers/lifecycleWorker.js';
 import { createApp } from './src/app.js';
 
 // After an uncaught exception / unhandled rejection, Node's state is undefined
@@ -48,6 +49,7 @@ if (process.env.ANTHROPIC_API_KEY) {
   console.warn('[structurer] ANTHROPIC_API_KEY not set — worker not started; submitted cards wait safely in draft');
 }
 startSlaWorker(); // A5: chases + escalation; non-response is never a verdict
+startLifecycleWorker(); // A4: idle drafts archive at 90d, never delete
 
 const server = app.listen(PORT, () => {
   console.log(`Olympus listening on http://localhost:${PORT}`);
@@ -57,6 +59,7 @@ async function shutdown(signal) {
   console.log(`\n${signal} received — shutting down`);
   stopStructurerWorker();
   stopSlaWorker();
+  stopLifecycleWorker();
   server.close(async () => {
     if (sessionRedis) await sessionRedis.quit();
     await disconnectMongo();

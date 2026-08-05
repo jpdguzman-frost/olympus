@@ -266,6 +266,31 @@ router.post('/api/admin/cards/:id/defer-packaging', async (req, res, next) => {
   }
 });
 
+/**
+ * C9 hook: the signals-noted resurface list for Endorsement Review
+ * (which runs manually, JP-held). Read-only; counts and quotes only.
+ */
+router.get('/api/admin/signals', async (req, res, next) => {
+  try {
+    const withSignals = await Card.find({ 'signalsNoted.0': { $exists: true } }).sort({ updatedAt: -1 });
+    const talentIds = [...new Set(withSignals.map((c) => c.talentId.toString()))];
+    const talents = await User.find({ _id: { $in: talentIds } }, { name: 1 });
+    const names = Object.fromEntries(talents.map((t) => [t._id.toString(), t.name]));
+    sendSuccess(
+      res,
+      withSignals.map((c) => ({
+        _id: c._id,
+        subject: c.subject,
+        status: c.status,
+        talentName: names[c.talentId.toString()] ?? '—',
+        signalsNoted: c.signalsNoted,
+      })),
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- Reads: admin reads all (Plan §4) ---
 router.get('/api/admin/cards', async (req, res, next) => {
   try {

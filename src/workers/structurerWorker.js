@@ -14,7 +14,7 @@
 
 import { Card } from '../models/Card.js';
 import { Track } from '../models/Track.js';
-import { structureCard, trackReadyForStructuring, StructuringError } from '../services/structurerService.js';
+import { structureCard, remapClaim, trackReadyForStructuring, StructuringError } from '../services/structurerService.js';
 import { transition } from '../services/statusMachine.js';
 import { pushCardAudit, recordAudit } from '../services/auditService.js';
 
@@ -50,9 +50,71 @@ export async function runStructuringPass({ client } = {}) {
     for (const card of candidates) {
       await structureOne(card, { client });
     }
+
+    await runContentionPass({ client });
   } finally {
     running = false;
   }
+}
+
+const MAX_CONTENTION_ATTEMPTS = 3;
+
+/**
+ * A4 contention loop: answer open contentions — re-map the line or
+ * explain. A mapping is never final over the talent's objection; the
+ * answered line always returns to the talent (never auto-approved).
+ */
+export async function runContentionPass({ client } = {}) {
+  const cards = await Card.find({
+    status: { $in: ['structured', 'adjust'] },
+    'claims.contentions.outcome': null,
+  }).limit(5);
+
+  const outcomes = [];
+  for (const card of cards) {
+    const track = await Track.findOne({ key: card.track });
+    if (!track || !trackReadyForStructuring(track)) continue;
+
+    for (const claim of card.claims) {
+      const open = (claim.contentions || []).find((c) => c.outcome === null);
+      if (!open) continue;
+
+      if (open.attempts >= MAX_CONTENTION_ATTEMPTS) {
+        open.outcome = 'explained';
+        open.response =
+          'This line could not be re-checked (a system problem, not you). It stays as drafted — you can still fix it, remove it, or ask JP.';
+        open.respondedAt = new Date();
+        pushCardAudit(card, { by: null, action: 'contention-failed', note: `claim ${claim._id}: gave up after ${open.attempts} attempts` });
+        continue;
+      }
+
+      try {
+        const opts = client ? { client } : {};
+        const result = await remapClaim(track, card, claim, open.text, opts);
+        if (result.outcome === 'remapped') {
+          Object.assign(claim, result.claim, {
+            talentApproved: false, // the re-map goes back to the talent, always
+            verdict: claim.verdict,
+          });
+        }
+        open.outcome = result.outcome;
+        open.response = result.explanation || (result.outcome === 'remapped' ? 'Re-mapped from your objection.' : '');
+        open.respondedAt = new Date();
+        pushCardAudit(card, {
+          by: null,
+          action: `contention-${result.outcome}`,
+          note: `claim ${claim._id}`,
+          after: { response: open.response },
+        });
+        outcomes.push({ cardId: card._id, claimId: claim._id, outcome: result.outcome });
+      } catch (err) {
+        open.attempts += 1; // retried next pass; capped above
+        console.error('[structurer] contention re-map failed', err.message);
+      }
+    }
+    await card.save();
+  }
+  return outcomes;
 }
 
 export async function structureOne(card, { client } = {}) {
@@ -72,10 +134,11 @@ export async function structureOne(card, { client } = {}) {
 
   try {
     const opts = client ? { client } : {};
-    const { claims, followUps, rejected } = await structureCard(track, card, opts);
+    const { claims, followUps, signalsNoted, rejected } = await structureCard(track, card, opts);
 
     card.claims = claims;
     card.followUps = followUps;
+    card.signalsNoted = signalsNoted ?? []; // A4: noted, never claimed, never a penalty
     card.packVersion = track.vocabPackVersion; // Invariant 1: the pack that structured it
     card.behaviorSpecVersion = track.behaviorSpecVersion ?? null; // A7: and the behavior spec, in split mode
     card.structuringError = null;

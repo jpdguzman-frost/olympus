@@ -52,6 +52,8 @@ export async function structureFixture(cardId, actorId) {
     type: 'competency',
     competencyOrDomain: 'placeholder-from-pack',
     sourceQuote: 'I ran the weekly builds myself.',
+    anchorText: 'GCash, April to June 2026', // A4: fixtures come anchored
+    anchorSource: 'structurer',
     flags: [],
   });
   await transition(card, 'structured', actorId);

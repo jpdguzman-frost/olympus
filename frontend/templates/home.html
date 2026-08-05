@@ -164,6 +164,7 @@
               {{#if .periodTag}}<span class="tag">{{.periodTag}}</span>{{/if}}
               <span>{{answeredCount(this)}} of 4 answered</span>
               {{#if .submittedForStructuringAt}}<span>sent — being read</span>{{/if}}
+              {{#if .archivesSoon}}<span class="tag" style="color: var(--amber-ink);">quiet for a while — moves to your archive soon; nothing is lost</span>{{/if}}
             </div>
             <div class="record-foot">
               <span class="spacer"></span>
@@ -192,6 +193,27 @@
                 <span>{{.claims}} claims</span>
               </div>
             {{/each}}
+          </article>
+        {{/each}}
+      </section>
+    {{/if}}
+
+    {{#if home.archived.length}}
+      <section>
+        <div class="section-label">Archive <span class="count">{{home.archived.length}}</span></div>
+        {{#each home.archived}}
+          <article class="record">
+            <div class="record-head">
+              {{#if .subject.name}}<span class="record-subject">{{.subject.name}}</span>{{else}}<span class="record-subject unnamed">Unnamed {{.subject.kind}}</span>{{/if}}
+            </div>
+            <div class="record-meta">
+              <span>put away after 90 quiet days — everything you wrote is still here</span>
+            </div>
+            <div class="record-foot">
+              <span class="spacer"></span>
+              <button class="btn btn-secondary" on-click="@this.reviveCard(this)">Bring it back</button>
+            </div>
+            <span class="stamp stamp-draft">Archived</span>
           </article>
         {{/each}}
       </section>

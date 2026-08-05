@@ -15,7 +15,7 @@ const app = new Ractive({
     isLead: false,
     isAdmin: false,
     error: null,
-    home: { confirmed: [], drafts: [], inFlight: [], track: null },
+    home: { confirmed: [], drafts: [], archived: [], inFlight: [], track: null },
     queue: [],
     signoffs: [],
     ladder: null,
@@ -133,6 +133,37 @@ const app = new Ractive({
 
   async removeClaim(claim) {
     await this.claimAction(claim, { action: 'fix', remove: true, concessionReason: claim.concessionText || null });
+  },
+
+  // A4: anchor a line — when it was, and where, in the talent's words.
+  async anchorClaim(claim) {
+    await this.claimAction(claim, { action: 'anchor', statement: claim.anchorInput });
+  },
+
+  // A4: contest a line against its traceback — the AI re-checks it.
+  async contestClaim(claim) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/decide`, {
+        action: 'contest',
+        statement: claim.contestText,
+      });
+      this.set('notice', "Got it — the line is being re-checked against your words. The answer lands here in about a minute.");
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  // A4: bring an archived draft back — nothing was lost.
+  async reviveCard(card) {
+    this.set({ error: null });
+    try {
+      const revived = await api('POST', `/api/cards/${card._id}/revive`);
+      window.location.hash = `#/card/${revived._id}`;
+    } catch (err) {
+      this.set('error', err.message);
+    }
   },
 
   // C1: stand by an adjusted claim as written — the defence goes on the record.

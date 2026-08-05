@@ -32,7 +32,7 @@ export const ROLES = ['talent', 'lead', 'nonadvocate', 'admin'];
  * escalation leg (A5: two chases, then auto-escalation).
  */
 export const CARD_STATUS_TRANSITIONS = {
-  draft: ['structured'],
+  draft: ['structured', 'archived'], // A4: idle drafts archive at 90d, revivable
   structured: ['talent-approved'],
   'talent-approved': ['exposure-signoff', 'routed'],
   'exposure-signoff': ['routed', 'talent-approved'],
@@ -43,7 +43,9 @@ export const CARD_STATUS_TRANSITIONS = {
   adjust: ['revised'],
   revised: ['routed'],
   confirmed: ['archived'],
-  archived: [],
+  // The archived → draft leg is revive (A4), guarded in the service:
+  // ONLY a card archived FROM draft can come back.
+  archived: ['draft'],
 };
 
 export const CARD_STATUSES = Object.keys(CARD_STATUS_TRANSITIONS);
@@ -74,6 +76,13 @@ export const FLAG_VOCABULARY = [
 export const SLA_CHASE_1_DAYS = 5;
 export const SLA_CHASE_2_DAYS = 8;
 export const SLA_ESCALATE_DAYS = 10;
+
+/**
+ * A4 draft lifecycle: drafts idle this long archive (never delete),
+ * with ONE nudge a week before. Revivable any time.
+ */
+export const DRAFT_ARCHIVE_DAYS = 90;
+export const DRAFT_NUDGE_DAYS = 83;
 
 /** BR-4: cards filed 60+ days after close carry STALE (context, never a block). */
 export const STALE_THRESHOLD_DAYS = 60;

@@ -36,6 +36,24 @@ const claimSchema = new Schema(
     verdictNote: { type: String, default: null },
     verdictBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     verdictAt: { type: Date, default: null },
+    // A4 date anchoring: no claim is approvable without account + date or
+    // period. Extracted from the talent's words at structuring, or added
+    // by the talent; an unanchored line stays draft — "needs a date".
+    anchorText: { type: String, default: null },
+    anchorSource: { type: String, enum: ['structurer', 'talent', null], default: null },
+    // A4 contention loop: the talent contests a line against its
+    // traceback; the AI re-maps or explains; a mapping is never final
+    // over the talent's objection. Full history kept.
+    contentions: [
+      {
+        text: { type: String, required: true }, // the talent's objection, verbatim
+        at: { type: Date, default: Date.now },
+        outcome: { type: String, enum: ['remapped', 'explained', null], default: null },
+        response: { type: String, default: null },
+        respondedAt: { type: Date, default: null },
+        attempts: { type: Number, default: 0 },
+      },
+    ],
     // C1: the talent's on-record defence of an adjusted claim. A reviewer
     // holding Adjust on a defended claim deadlocks the card.
     defenseStatement: { type: String, default: null },
@@ -148,6 +166,16 @@ const cardSchema = new Schema(
       },
     ],
     claims: [claimSchema],
+    // A4: "signal noted, not claimed" — upward signals the talent chose
+    // not to claim. Recorded, visible to the reviewer, resurfaced at
+    // Endorsement Review (C9 hook). Never a penalty.
+    signalsNoted: [
+      {
+        signal: { type: String, required: true },
+        sourceQuote: { type: String, required: true }, // verbatim, validated
+        at: { type: Date, default: Date.now },
+      },
+    ],
     productionRecord: [{ type: Schema.Types.Mixed }],
     honestGap: { type: String, default: null }, // talent's own words only (FR-19)
     nomination: { type: nominationSchema, default: () => ({}) },
@@ -183,6 +211,10 @@ const cardSchema = new Schema(
     // level is always recorded and never erased. Status stays 'confirmed'.
     packagingDeferredBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     packagingDeferredAt: { type: Date, default: null },
+    // A4 draft lifecycle: what status the card archived from (only
+    // 'draft' archives may revive) and the one pre-expiry nudge.
+    archivedFrom: { type: String, default: null },
+    archiveNudgeAt: { type: Date, default: null },
     audit: [auditEntrySchema],
   },
   { timestamps: true },

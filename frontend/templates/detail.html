@@ -75,8 +75,21 @@
               {{/each}}
             </div>
           {{/if}}
+          <p class="muted" style="font-size: var(--text-xs); margin-bottom: 0.1rem;">{{#if isReviewScreen}}Because they said:{{else}}Because you said:{{/if}}</p>
           <p class="verbatim">“{{.sourceQuote}}”</p>
+          {{#if .anchorText}}
+            <p class="muted" style="font-size: var(--text-sm);"><span class="tag">when &amp; where</span> {{.anchorText}}</p>
+          {{/if}}
           {{#if .involvement}}<p class="muted" style="font-size: var(--text-sm);">{{.involvement}}</p>{{/if}}
+          {{#each .contentions}}
+            {{#if .outcome === null}}
+              <div class="banner banner-info" style="margin: 0.6rem 0 0;">You said this mapping is wrong. It's being re-checked — the answer lands here in about a minute.</div>
+            {{elseif .response}}
+              <div class="banner banner-info" style="margin: 0.6rem 0 0;">
+                {{#if .outcome === 'remapped'}}Re-mapped from your objection.{{/if}} {{.response}}
+              </div>
+            {{/if}}
+          {{/each}}
           {{#if .verdictNote}}
             <div class="banner {{.verdict === 'Confirmed' ? 'banner-safe' : 'banner-warn'}}" style="margin: 0.6rem 0 0;">
               {{#if .verdict === 'Confirmed'}}Checked by your reviewer: {{else}}Reviewer's note: {{/if}}{{.verdictNote}}
@@ -114,10 +127,20 @@
                 <button class="btn btn-quiet" on-click="@this.set('card.claims.' + ci + '.editing', false)">Cancel</button>
               </div>
             {{else}}
+              {{#if !.anchorText}}
+                <div class="sweep-actions" style="flex-wrap: wrap;">
+                  <input type="text" value="{{.anchorInput}}" placeholder="This line needs a date — when was this, and where? e.g. JFC, April to June 2026" style="flex: 2;" />
+                  <button class="btn btn-secondary" on-click="@this.anchorClaim(this)">Save the date</button>
+                </div>
+              {{/if}}
               <div class="sweep-actions" style="flex-wrap: wrap;">
-                <button class="btn btn-primary" on-click="@this.approveClaim(this)">Yes — this is mine</button>
+                <button class="btn btn-primary" on-click="@this.approveClaim(this)" disabled="{{!.anchorText}}">Yes — this is mine</button>
                 <button class="btn btn-secondary" on-click="@this.startFix(this, ci)">Fix it</button>
                 <button class="btn btn-danger" on-click="@this.removeClaim(this)">Not mine — remove</button>
+              </div>
+              <div class="sweep-actions" style="margin-top: 0.4rem;">
+                <input type="text" value="{{.contestText}}" placeholder="Or: that's not what my words mean — say what's wrong" style="flex: 2;" />
+                <button class="btn btn-quiet" on-click="@this.contestClaim(this)">Re-check this line</button>
               </div>
               {{#if card.status === 'adjust' && .verdict === 'Adjust' && !.defenseStatement}}
                 <div class="sweep-actions" style="margin-top: 0.4rem;">
@@ -139,6 +162,21 @@
             </div>
           {{/if}}
         </article>
+      {{/each}}
+    </section>
+  {{/if}}
+
+  {{#if card.signalsNoted && card.signalsNoted.length}}
+    <section>
+      <div class="section-label">Noted, not claimed</div>
+      {{#each card.signalsNoted}}
+        <div class="question-block">
+          <div class="question-text">{{.signal}}</div>
+          <p class="verbatim">“{{.sourceQuote}}”</p>
+          <p class="muted" style="font-size: var(--text-xs);">
+            {{#if isReviewScreen}}They chose not to claim this — you can still ask about it.{{else}}You chose not to claim this. It's just noted — no pressure, nothing counts against you.{{/if}}
+          </p>
+        </div>
       {{/each}}
     </section>
   {{/if}}

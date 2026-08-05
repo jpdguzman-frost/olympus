@@ -23,6 +23,7 @@ router.get('/api/home', async (req, res, next) => {
       ladder: null, // level derivation arrives in P5 (reader service)
       confirmed: own.filter((c) => c.status === 'confirmed'),
       drafts: own.filter((c) => c.status === 'draft'),
+      archived: own.filter((c) => c.status === 'archived' && c.archivedFrom === 'draft'), // A4: revivable
       inFlight: own.filter((c) => !['draft', 'confirmed', 'archived'].includes(c.status)),
       track: track && {
         key: track.key,
@@ -196,6 +197,15 @@ router.get('/api/signoffs', async (req, res, next) => {
 router.post('/api/cards/:id/signoff', async (req, res, next) => {
   try {
     sendSuccess(res, await confirm.decideSignoff(req.currentUser, req.params.id, req.body ?? {}));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- A4: revive an archived draft (nothing was lost) ---
+router.post('/api/cards/:id/revive', async (req, res, next) => {
+  try {
+    sendSuccess(res, await cards.reviveCard(req.currentUser, req.params.id));
   } catch (err) {
     next(err);
   }

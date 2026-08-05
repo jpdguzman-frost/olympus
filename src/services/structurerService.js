@@ -91,42 +91,63 @@ export function composeSystemPrompt(track) {
  * Deliberately absent: any field for level, rung, tier, texture, rank,
  * readiness, promotion, or raise — there is nowhere to put one.
  */
+function claimItemSchema(track) {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['type', 'competencyOrDomain', 'labels', 'sourceQuote', 'flags', 'anchor'],
+    properties: {
+      type: { type: 'string' },
+      competencyOrDomain: { type: 'string', enum: track.competencyOrDomainList },
+      labels: {
+        type: 'object',
+        additionalProperties: false,
+        required: [],
+        properties: Object.fromEntries(
+          Object.entries(track.controlledVocabulary || {}).map(([field, values]) => [
+            field,
+            { type: 'string', enum: values },
+          ]),
+        ),
+      },
+      sourceQuote: { type: 'string' },
+      involvement: { type: 'string' },
+      countAfterMe: { type: 'integer' },
+      flags: { type: 'array', items: { type: 'string', enum: trackClaimFlags(track) } },
+      // A4 date anchoring: account + date/period IN THE TALENT'S WORDS,
+      // empty string when they never said one. Never invented.
+      anchor: { type: 'string' },
+    },
+  };
+}
+
 export function buildOutputSchema(track) {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['claims', 'followUps'],
+    required: ['claims', 'followUps', 'signalsNoted'],
     properties: {
       claims: {
         type: 'array',
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['type', 'competencyOrDomain', 'labels', 'sourceQuote', 'flags'],
-          properties: {
-            type: { type: 'string' },
-            competencyOrDomain: { type: 'string', enum: track.competencyOrDomainList },
-            labels: {
-              type: 'object',
-              additionalProperties: false,
-              required: [],
-              properties: Object.fromEntries(
-                Object.entries(track.controlledVocabulary || {}).map(([field, values]) => [
-                  field,
-                  { type: 'string', enum: values },
-                ]),
-              ),
-            },
-            sourceQuote: { type: 'string' },
-            involvement: { type: 'string' },
-            countAfterMe: { type: 'integer' },
-            flags: { type: 'array', items: { type: 'string', enum: trackClaimFlags(track) } },
-          },
-        },
+        items: claimItemSchema(track),
       },
       followUps: {
         type: 'array',
         items: { type: 'string' },
+      },
+      // A4: upward signals present in the words but not claimed —
+      // recorded with their verbatim quote, never as a claim.
+      signalsNoted: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['signal', 'sourceQuote'],
+          properties: {
+            signal: { type: 'string' },
+            sourceQuote: { type: 'string' },
+          },
+        },
       },
     },
   };
@@ -252,6 +273,10 @@ export function validateStructuredOutput(track, card, output) {
     const allowedFlags = trackClaimFlags(track);
     const flags = (raw.flags || []).filter((f) => allowedFlags.includes(f));
 
+    // A4 anchor: kept only when the model actually extracted one from
+    // the talent's words; an empty anchor leaves the line "needs a date".
+    const anchorText = typeof raw.anchor === 'string' && raw.anchor.trim() ? raw.anchor.trim() : null;
+
     claims.push({
       type: raw.type || 'claim',
       competencyOrDomain: raw.competencyOrDomain,
@@ -260,9 +285,23 @@ export function validateStructuredOutput(track, card, output) {
       involvement: raw.involvement ?? null,
       countAfterMe: Number.isInteger(raw.countAfterMe) ? raw.countAfterMe : null,
       flags,
+      anchorText,
+      anchorSource: anchorText ? 'structurer' : null,
       talentApproved: false,
       verdict: null,
     });
+  }
+
+  // A4 signals noted, not claimed: same anti-fabrication bar as claims —
+  // the quote must be the talent's verbatim words or the signal drops.
+  const signalsNoted = [];
+  for (const raw of Array.isArray(output.signalsNoted) ? output.signalsNoted : []) {
+    const quote = normalize(raw.sourceQuote);
+    if (!raw.signal?.trim() || !quote || !allWords.includes(quote)) {
+      rejected.push({ claim: raw, reason: 'Signal quote is missing or does not appear in the raw answers' });
+      continue;
+    }
+    signalsNoted.push({ signal: raw.signal.trim(), sourceQuote: raw.sourceQuote, at: new Date() });
   }
 
   // FR-9: two clarification follow-ups per card, maximum. Excess is dropped.
@@ -271,5 +310,93 @@ export function validateStructuredOutput(track, card, output) {
     .slice(0, MAX_FOLLOW_UPS)
     .map((question) => ({ question, answer: null }));
 
-  return { claims, followUps, rejected };
+  return { claims, followUps, signalsNoted, rejected };
+}
+
+// ---------------------------------------------------------------------------
+// A4 contention loop — single-line re-map
+// ---------------------------------------------------------------------------
+
+/**
+ * The talent contested a line against its traceback. The model re-reads
+ * the objection and either re-maps the line or explains why the mapping
+ * stands. A re-map runs back through the FR-10 layer — it can never
+ * inflate past the vocabulary; a rejected re-map becomes an explanation.
+ * Returns { outcome: 'remapped'|'explained', claim|null, explanation }.
+ */
+export async function remapClaim(track, card, claim, contentionText, { client = getClient() } = {}) {
+  if (!trackReadyForStructuring(track)) {
+    throw new StructuringError('awaiting-pack', `Track "${track.key}" is not ready`);
+  }
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['remapped', 'claim', 'explanation'],
+    properties: {
+      remapped: { type: 'boolean' },
+      claim: claimItemSchema(track),
+      explanation: { type: 'string' },
+    },
+  };
+
+  const userContent = [
+    renderCardInput(card),
+    '',
+    'CONTESTED LINE (currently drafted):',
+    JSON.stringify({
+      competencyOrDomain: claim.competencyOrDomain,
+      labels: claim.labels,
+      sourceQuote: claim.sourceQuote,
+      anchor: claim.anchorText,
+      flags: claim.flags,
+    }),
+    '',
+    `THE TALENT CONTESTS THIS MAPPING (verbatim): ${contentionText}`,
+    '',
+    'Re-read the objection against the traceback quote and the raw answers.',
+    'If the mapping should change, set remapped=true and output the corrected line.',
+    'If the mapping stands, set remapped=false and explain why in plain, simple words.',
+    'All your rules still apply: only the controlled vocabulary, ambiguity defaults down, never inflate.',
+  ].join('\n');
+
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 8000,
+    system: composeSystemPrompt(track),
+    messages: [{ role: 'user', content: userContent }],
+    output_config: { format: { type: 'json_schema', schema } },
+  });
+
+  if (response.stop_reason === 'refusal') {
+    throw new StructuringError('refusal', 'The model declined to process this contention');
+  }
+  const textBlock = response.content.find((b) => b.type === 'text');
+  if (!textBlock) throw new StructuringError('empty-response', 'No re-map output returned');
+
+  let parsed;
+  try {
+    parsed = JSON.parse(textBlock.text);
+  } catch (err) {
+    throw new StructuringError('parse-failure', `Re-map output was not valid JSON: ${err.message}`);
+  }
+
+  if (!parsed.remapped) {
+    return { outcome: 'explained', claim: null, explanation: parsed.explanation || 'The mapping stands.' };
+  }
+
+  // Invariant 6/10: the re-map faces the same wall the original did.
+  const { claims, rejected } = validateStructuredOutput(track, card, {
+    claims: [parsed.claim],
+    followUps: [],
+    signalsNoted: [],
+  });
+  if (!claims.length) {
+    return {
+      outcome: 'explained',
+      claim: null,
+      explanation: `The re-map could not stand: ${rejected[0]?.reason ?? 'validation failed'}. The line stays as it was.`,
+    };
+  }
+  return { outcome: 'remapped', claim: claims[0], explanation: parsed.explanation || '' };
 }
