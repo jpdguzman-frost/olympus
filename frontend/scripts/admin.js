@@ -9,6 +9,7 @@ const app = new Ractive({
     notice: null,
     users: [],
     leads: [],
+    activeUsers: [],
     tracks: [],
     audit: [],
     calibration: [],
@@ -47,6 +48,20 @@ const app = new Ractive({
     this.set({ error: null, notice: null });
     try {
       await api('PATCH', `/api/admin/users/${user._id}`, { active: !user.active });
+      await refresh();
+    } catch (err) {
+      this.set('error', err.message);
+    }
+  },
+
+  async saveSettings(track) {
+    this.set({ error: null, notice: null });
+    try {
+      await api('PATCH', `/api/admin/tracks/${track.key}/settings`, {
+        fallbackReviewerId: track.fallbackReviewerId || null,
+        exposureVerifierId: track.exposureVerifierId || null,
+      });
+      this.set('notice', `${track.label} settings saved and logged.`);
       await refresh();
     } catch (err) {
       this.set('error', err.message);
@@ -118,6 +133,7 @@ async function refresh() {
     audit: audit.slice(0, 25),
     calibration,
     leads: users.filter((u) => u.roles.includes('lead') && u.active),
+    activeUsers: users.filter((u) => u.active),
   });
 }
 

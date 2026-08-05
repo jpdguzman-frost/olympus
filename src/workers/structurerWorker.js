@@ -58,9 +58,13 @@ export async function runStructuringPass({ client } = {}) {
 export async function structureOne(card, { client } = {}) {
   const track = await Track.findOne({ key: card.track });
   if (!track || !trackReadyForStructuring(track)) {
-    // Not an error: structuring simply waits for the pack. The card is
-    // safe in draft; no attempt is burned.
-    card.structuringError = 'awaiting-pack';
+    // Not an error: structuring simply waits for the pack (or, in split
+    // mode, the behavior spec). The card is safe in draft; no attempt is
+    // burned.
+    card.structuringError =
+      track?.packMode === 'vocab-only' && track?.packText && !track?.behaviorSpecText
+        ? 'awaiting-behavior-spec'
+        : 'awaiting-pack';
     card.nextStructuringAttemptAt = new Date(Date.now() + 10 * 60_000);
     await card.save();
     return { outcome: 'awaiting-pack' };
@@ -73,6 +77,7 @@ export async function structureOne(card, { client } = {}) {
     card.claims = claims;
     card.followUps = followUps;
     card.packVersion = track.vocabPackVersion; // Invariant 1: the pack that structured it
+    card.behaviorSpecVersion = track.behaviorSpecVersion ?? null; // A7: and the behavior spec, in split mode
     card.structuringError = null;
     card.nextStructuringAttemptAt = null;
     card.calibrationHold = Boolean(track.calibrationMode); // FR-11

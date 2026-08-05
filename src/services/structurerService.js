@@ -37,14 +37,53 @@ function getClient() {
   return defaultClient;
 }
 
-/** A track can structure only once its pack is loaded (Invariant 1). */
+/**
+ * A track can structure only once its pack is loaded (Invariant 1) — and,
+ * in split mode (packMode 'vocab-only', A7), only once a behavior spec is
+ * published too: a vocab-only pack has no behavior in it, so structuring
+ * with the pack alone would run rule-less. Fails closed.
+ */
 export function trackReadyForStructuring(track) {
-  return Boolean(
+  const packReady = Boolean(
     track?.packText &&
       track?.vocabPackVersion &&
       Array.isArray(track.competencyOrDomainList) &&
       track.competencyOrDomainList.length > 0,
   );
+  if (!packReady) return false;
+  if (track.packMode === 'vocab-only') {
+    return Boolean(track.behaviorSpecVersion && track.behaviorSpecText);
+  }
+  return true;
+}
+
+/**
+ * Ruling C6: two flag layers. The AI may only output the pack's
+ * claim-level flags (§B8, stored on the track); tracks without a
+ * claim-flag list (legacy packs) keep the original FLAG_VOCABULARY.
+ * Card/system-level flags (STALE, THIN-POOL, …) are attached by the
+ * server, never by the AI.
+ */
+export function trackClaimFlags(track) {
+  return Array.isArray(track?.claimFlags) && track.claimFlags.length > 0
+    ? track.claimFlags
+    : FLAG_VOCABULARY;
+}
+
+/**
+ * The system prompt. Split mode (A7): behavior spec (versioned data,
+ * never hard-coded) + the vocab pack's §B/§C. Legacy: the pack verbatim.
+ */
+export function composeSystemPrompt(track) {
+  if (track.packMode === 'vocab-only') {
+    return [
+      track.behaviorSpecText,
+      '\n---\n',
+      'CONTROLLED VOCABULARY AND CARD SCHEMA (closed lists — the only words and shape you may output):',
+      track.packText,
+    ].join('\n');
+  }
+  return track.packText; // the calibrated pack, verbatim — reproduce, don't improve
 }
 
 /**
@@ -81,7 +120,7 @@ export function buildOutputSchema(track) {
             sourceQuote: { type: 'string' },
             involvement: { type: 'string' },
             countAfterMe: { type: 'integer' },
-            flags: { type: 'array', items: { type: 'string', enum: FLAG_VOCABULARY } },
+            flags: { type: 'array', items: { type: 'string', enum: trackClaimFlags(track) } },
           },
         },
       },
@@ -129,7 +168,7 @@ export async function structureCard(track, card, { client = getClient() } = {}) 
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 16000,
-    system: track.packText, // the calibrated pack, verbatim — reproduce, don't improve
+    system: composeSystemPrompt(track),
     messages: [{ role: 'user', content: renderCardInput(card) }],
     output_config: { format: { type: 'json_schema', schema: buildOutputSchema(track) } },
   });
@@ -210,7 +249,8 @@ export function validateStructuredOutput(track, card, output) {
     }
     if (!labelsOk) continue;
 
-    const flags = (raw.flags || []).filter((f) => FLAG_VOCABULARY.includes(f));
+    const allowedFlags = trackClaimFlags(track);
+    const flags = (raw.flags || []).filter((f) => allowedFlags.includes(f));
 
     claims.push({
       type: raw.type || 'claim',

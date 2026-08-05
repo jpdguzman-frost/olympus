@@ -4,7 +4,16 @@
  *
  * packText/competencyOrDomainList arrive from the versioned vocab packs
  * (Invariant 1: the model is upstream — the app never invents vocabulary).
- * fallbackReviewerId stays null until OD-2 is decided (config, not code).
+ *
+ * Split mode (Amendment 1 §A7, from Ops pack v0.4): packMode 'vocab-only'
+ * means the pack carries vocabulary/schema only and structuring composes
+ * behaviorSpecText (versioned, admin-published, never hard-coded) with the
+ * pack. packMode 'legacy' = the pack is the whole system prompt (A&A until
+ * its v0.4 arrives).
+ *
+ * fallbackReviewerId / exposureVerifierId are admin-assignable role
+ * settings (Ruling OD-2): configured in the admin UI, changeable without
+ * deploy, read at use time. Both stay null until set at pilot.
  */
 
 import mongoose from 'mongoose';
@@ -24,7 +33,14 @@ const trackSchema = new mongoose.Schema(
     // Machine-readable controlled vocabulary from the pack: {labelField: [allowed values]}.
     // The FR-10 validation layer fails closed when this is empty.
     controlledVocabulary: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Ruling C6 two-layer flags: claim-level flags from the pack (§B8) —
+    // the only flags the AI may output. Empty = legacy FLAG_VOCABULARY.
+    claimFlags: { type: [String], default: [] },
+    packMode: { type: String, enum: ['legacy', 'vocab-only'], default: 'legacy' },
+    behaviorSpecVersion: { type: String, default: null },
+    behaviorSpecText: { type: String, default: null },
     fallbackReviewerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    exposureVerifierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     calibrationMode: { type: Boolean, default: true }, // FR-11; exits via GATE-1 (JP-owned)
   },
   { timestamps: true },

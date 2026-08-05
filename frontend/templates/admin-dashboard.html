@@ -28,14 +28,45 @@
         <div class="pack-panel">
           <h3>{{.label}} <span class="meta">({{.key}})</span></h3>
           {{#if .vocabPackVersion}}
-            <span class="meta">Vocabulary pack {{.vocabPackVersion}}</span>
+            <span class="meta">Vocabulary pack {{.vocabPackVersion}}{{#if .packMode === 'vocab-only'}} · vocab-only{{/if}}</span>
           {{else}}
             <span class="pending">NO VOCABULARY PACK LOADED — structuring (P3) waits on it</span>
+          {{/if}}
+          {{#if .packMode === 'vocab-only'}}
+            {{#if .behaviorSpecVersion}}
+              <span class="meta"> · behavior spec {{.behaviorSpecVersion}}</span>
+            {{else}}
+              <span class="pending">NO BEHAVIOR SPEC PUBLISHED — split-mode structuring waits on it</span>
+            {{/if}}
           {{/if}}
           <div class="record-meta" style="margin-top: 0.5rem;">
             <span class="tag">{{#if .calibrationMode}}calibration ON{{else}}calibration off{{/if}}</span>
             <span>{{.questionSet.length}} fixed questions</span>
           </div>
+          <div class="form-row" style="margin-top: 0.75rem;">
+            <label class="field">
+              <span class="field-name">Fallback reviewer (verdict SLA escalation)</span>
+              <select value="{{.fallbackReviewerId}}">
+                <option value="">not set</option>
+                {{#each ~/activeUsers}}
+                  <option value="{{._id}}">{{.name}}</option>
+                {{/each}}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-name">Exposure verifier (nomination sign-off)</span>
+              <select value="{{.exposureVerifierId}}">
+                <option value="">not set</option>
+                {{#each ~/activeUsers}}
+                  <option value="{{._id}}">{{.name}}</option>
+                {{/each}}
+              </select>
+            </label>
+            <button class="btn btn-secondary" style="align-self: flex-end;" on-click="@this.saveSettings(this)">Save settings</button>
+          </div>
+          <p class="muted" style="font-size: var(--text-xs); margin-top: 0.4rem;">
+            Role settings, not code — read at use time. A fallback reviewer is never assigned to a card where they are the talent, the nominee, or a party to the deadlock.
+          </p>
         </div>
       {{/each}}
     </section>

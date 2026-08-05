@@ -1,0 +1,118 @@
+{
+  "notes": {
+    "source": "Olympus__Pack_Ops_v0.4.md — canonical Ops vocabulary (sheet retired). Transcribed verbatim from §B/§C; do not invent entries.",
+    "packMode": "vocab-only: this pack carries VOCABULARY and SCHEMA only. All behavior lives in Olympus__M0_Intent_v2.md, published separately as a versioned behavior spec (never hard-coded). The app composes behavior spec + pack §B/§C as the structuring prompt.",
+    "flagLayers": "Ruling C6 (2026-08-05): two layers govern. claimFlags = Pack §B8, closed list, applied to individual claim lines (the only flags the AI may output). cardFlags = the BR-1/BR-4/FR-15 system set, applied by the SERVER at card/system level (STALE at presentation, THIN-POOL at nomination, NOT-TRIGGERED at reading) — never by the AI.",
+    "zeroStates": "\"Not Yet\" (execution score 0) is transcribed in scores but deliberately absent from the claimable execution enum: silence and ownership-less mentions map to NOT-CLAIMED, never to a zero-state (Invariant 7; same ruling as v0.2/v0.3 transcriptions)."
+  },
+  "packMode": "vocab-only",
+  "competencyOrDomainList": [
+    "Pipeline & Board Management",
+    "Request intake & filing",
+    "Revision tracking",
+    "Status & blockers",
+    "Workflow & file management",
+    "Meeting facilitation",
+    "Cross-functional coordination",
+    "Reliability",
+    "Operational resiliency",
+    "Operational awareness",
+    "Ops systems design",
+    "Tool & automation development",
+    "Platform & account administration",
+    "Resource management",
+    "Budget & tools forecasting",
+    "Team onboarding",
+    "Process design & improvement"
+  ],
+  "parts": {
+    "part1Competencies": [
+      "Pipeline & Board Management",
+      "Request intake & filing",
+      "Revision tracking",
+      "Status & blockers",
+      "Workflow & file management",
+      "Meeting facilitation",
+      "Cross-functional coordination"
+    ],
+    "part2Gates": [
+      "Reliability",
+      "Operational resiliency",
+      "Operational awareness",
+      "Ops systems design"
+    ],
+    "part2RampGates": ["Ops systems design"],
+    "part3BoltIns": [
+      "Tool & automation development",
+      "Platform & account administration",
+      "Resource management",
+      "Budget & tools forecasting",
+      "Team onboarding",
+      "Process design & improvement"
+    ]
+  },
+  "controlledVocabulary": {
+    "execution": [
+      "My work is being checked by someone else",
+      "I fully own the work — no one checks behind me",
+      "I own the work but delegates it to someone else"
+    ],
+    "decision": [
+      "I executed the decision given to me",
+      "I proposed and someone decided",
+      "I made the decision, but someone above me could overturn it",
+      "The decision is fully rest on me and no one else"
+    ],
+    "scope": [
+      "Own work",
+      "Own account",
+      "Others' work",
+      "Across tracks"
+    ]
+  },
+  "claimFlags": [
+    "Floor met",
+    "Call not owned",
+    "did not make the call — doesn't lift level",
+    "No disruption on record — not a gap",
+    "insufficient detail — draft",
+    "signal noted, not claimed",
+    "not yet reached — not a gap",
+    "designed, not held — doesn't lift level"
+  ],
+  "cardFlags": [
+    "NEEDS-OWNER",
+    "COULD-BE-HIGHER",
+    "NEEDS-2A",
+    "NEEDS-INVOLVEMENT",
+    "FLOOR-BLOCKS-CLIMB",
+    "STALE",
+    "PROPOSED-BOLT-IN",
+    "THIN-POOL",
+    "NOT-TRIGGERED",
+    "NOT-CLAIMED"
+  ],
+  "verdictStates": ["Pending", "Adjust", "Confirmed"],
+  "derivationData": {
+    "notes": "Score columns transcribed from §B1–§B3 verbatim. Staged for OD-5 (the derivation formula's in-app home, decided by JP before M4). Display-only until then — the AI never reads or outputs these.",
+    "executionScores": {
+      "Not Yet": 0,
+      "My work is being checked by someone else": 1,
+      "I fully own the work — no one checks behind me": 2,
+      "I own the work but delegates it to someone else": 3
+    },
+    "decisionScores": {
+      "I executed the decision given to me": 0,
+      "I proposed and someone decided": 1,
+      "I made the decision, but someone above me could overturn it": 2,
+      "The decision is fully rest on me and no one else": 3
+    },
+    "scopeTiers": {
+      "Own work": 1,
+      "Own account": 2,
+      "Others' work": 3,
+      "Across tracks": 4
+    },
+    "levelLabels": ["J1", "J2", "J2 → Mid", "Mid", "Senior"]
+  }
+}

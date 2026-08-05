@@ -10,6 +10,7 @@ import { requireRole } from '../middleware/auth.js';
 import { User } from '../models/User.js';
 import { Track } from '../models/Track.js';
 import { VocabPackVersion } from '../models/VocabPackVersion.js';
+import { BehaviorSpecVersion } from '../models/BehaviorSpecVersion.js';
 import { AuditLog } from '../models/AuditLog.js';
 import { Card } from '../models/Card.js';
 import { recordAudit } from '../services/auditService.js';
@@ -99,6 +100,13 @@ router.post('/api/admin/tracks/:key/pack', async (req, res, next) => {
     track.vocabPackVersion = version;
     track.packText = packText;
     if (Array.isArray(competencyOrDomainList)) track.competencyOrDomainList = competencyOrDomainList;
+    const { controlledVocabulary, claimFlags, packMode } = req.body ?? {};
+    if (controlledVocabulary && typeof controlledVocabulary === 'object') track.controlledVocabulary = controlledVocabulary;
+    if (Array.isArray(claimFlags)) track.claimFlags = claimFlags;
+    if (packMode !== undefined) {
+      if (!['legacy', 'vocab-only'].includes(packMode)) throw badRequest('packMode must be legacy or vocab-only');
+      track.packMode = packMode;
+    }
     await track.save();
 
     await recordAudit({
@@ -106,6 +114,71 @@ router.post('/api/admin/tracks/:key/pack', async (req, res, next) => {
       before, after: { vocabPackVersion: version, packId: pack._id },
     });
     sendSuccess(res, track, 201);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Behavior spec publishing (A7): the AI's capture/structuring behavior as
+ * versioned, append-only DATA — never hard-coded. CALIBRATING until the
+ * verbatim GATE-1 port; JP republishes here to revise.
+ */
+router.post('/api/admin/tracks/:key/behavior-spec', async (req, res, next) => {
+  try {
+    const track = await Track.findOne({ key: req.params.key });
+    if (!track) throw notFound('Track not found');
+    const { version, text } = req.body ?? {};
+    if (!version || !text) throw badRequest('version and text are required');
+
+    const spec = await BehaviorSpecVersion.create({ trackKey: track.key, version, text });
+    const before = { behaviorSpecVersion: track.behaviorSpecVersion };
+    track.behaviorSpecVersion = version;
+    track.behaviorSpecText = text;
+    await track.save();
+
+    await recordAudit({
+      actorId: req.currentUser._id, action: 'track.behavior-spec-publish', entity: 'track', entityId: track._id,
+      before, after: { behaviorSpecVersion: version, specId: spec._id },
+    });
+    sendSuccess(res, track, 201);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Role settings (Ruling OD-2): fallback reviewer + exposure verifier are
+ * admin-assignable per track — configured here, changeable without
+ * deploy, read at use time (escalation / sign-off routing), never
+ * hard-coded. Card-level exclusion (never the talent, the nominee, or a
+ * deadlock party) is enforced where the assignment meets a card (B2/B3).
+ */
+router.patch('/api/admin/tracks/:key/settings', async (req, res, next) => {
+  try {
+    const track = await Track.findOne({ key: req.params.key });
+    if (!track) throw notFound('Track not found');
+
+    const before = { fallbackReviewerId: track.fallbackReviewerId, exposureVerifierId: track.exposureVerifierId };
+    for (const field of ['fallbackReviewerId', 'exposureVerifierId']) {
+      if (!(field in (req.body ?? {}))) continue;
+      const value = req.body[field];
+      if (value === null || value === '') {
+        track[field] = null;
+        continue;
+      }
+      const user = await User.findById(value);
+      if (!user) throw badRequest(`${field}: no such user`);
+      if (!user.active) throw badRequest(`${field}: ${user.name} is deactivated`);
+      track[field] = user._id;
+    }
+    await track.save();
+
+    await recordAudit({
+      actorId: req.currentUser._id, action: 'track.settings', entity: 'track', entityId: track._id,
+      before, after: { fallbackReviewerId: track.fallbackReviewerId, exposureVerifierId: track.exposureVerifierId },
+    });
+    sendSuccess(res, track);
   } catch (err) {
     next(err);
   }

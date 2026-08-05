@@ -1,7 +1,7 @@
 {
   "name": "olympus",
   "version": "0.1.0",
-  "description": "Frost Competency Evidence Pipeline — evidence capture, AI structuring, non-advocate validation",
+  "description": "Frost Competency Evidence Pipeline \u2014 evidence capture, AI structuring, non-advocate validation",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -12,7 +12,8 @@
     "load-packs": "node scripts/load-packs.js",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:tz": "TZ=UTC vitest run && TZ=Asia/Manila vitest run"
+    "test:tz": "TZ=UTC vitest run && TZ=Asia/Manila vitest run",
+    "load-behavior-spec": "node scripts/load-behavior-spec.js"
   },
   "license": "UNLICENSED",
   "private": true,

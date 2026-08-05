@@ -113,6 +113,7 @@ const cardSchema = new Schema(
     honestGap: { type: String, default: null }, // talent's own words only (FR-19)
     nomination: { type: nominationSchema, default: () => ({}) },
     packVersion: { type: String, default: null }, // Invariant 1: records the pack that structured it
+    behaviorSpecVersion: { type: String, default: null }, // A7: and the behavior spec, in split mode
     createdViaShellBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // FR-5
     submittedForStructuringAt: { type: Date, default: null },
     structuringAttempts: { type: Number, default: 0 },

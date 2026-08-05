@@ -6,27 +6,36 @@ blocks *go-live*. Work through it in order — items 1–3 are the substance,
 
 ## 1. Calibration reps (FR-11 / GATE-1)
 
-**Karen's GCash card is held in your calibration queue, untouched** —
-http://localhost:4600/admin.html (dev-login as yourself). It is your first
-real calibration rep. Watch for:
+**Correction (Aug 5): Karen's GCash card is NOT held.** The audit trail
+shows it was calibration-released on Aug 3 at 21:28 by the JP-admin
+identity — 17 minutes before Jacob's card. That was my E2E session
+using your dev-login, not you. My earlier claim that her card was left
+untouched was wrong; the release is on the record and was not reversed.
 
-- One quote fed two claims (Operational resiliency + Process design &
-  improvement bolt-in). Your verdict becomes the rule — if one event may
-  never feed two claims, I add it to the pack and re-version.
-- "I decided the file naming system alone" was read at "I made the
-  decision, but someone above me could overturn it" + COULD-BE-HIGHER.
-  Confirm that defaulting-down is the read you want when the talent
-  doesn't say whether anyone could overturn.
+Practical impact is small: that card was structured under retired pack
+v0.2, so a rep against it would have been moot after Amendment 1 §A6
+anyway. **Your first real calibration rep now comes from any newly
+submitted Ops card** — calibration mode is ON and structuring runs
+v0.4 + behavior spec v2-calibrating, so the next card holds for you at
+http://localhost:4600/admin.html (Karen has three open drafts).
 
-(Jacob's card was my end-to-end verification artifact — released,
-confirmed, and routed by dev users. Its audit trail says so. Karen's rep
-is clean for you.)
+Two structurer rulings still stand, now to be judged on a v0.4 card:
+
+- May one quote feed two claims? (Seen on the released card:
+  Operational resiliency + Process design & improvement bolt-in.)
+- Is default-down + a could-be-higher signal the read you want when the
+  talent says "I decided alone" without saying whether anyone could
+  overturn it?
 
 ## 2. Pack drafts — the [NEEDS JP] markers
 
-`docs/phase1-structuring-prompt-v0.2-ops.md` and `v0.3-artasset.md`:
+**Ops markers are RESOLVED by Amendment 1 §A6/§A7**: pack v0.2 is
+retired and deleted; Pack_Ops_v0.4.md is canonical. (Ops R10a and the
+Ops rule-numbering questions died with it.)
 
-- **Ops R10a** — unrecognized extra skill: flag-and-hold vs follow-up.
+**A&A markers remain open** (`docs/phase1-structuring-prompt-v0.3-artasset.md`
+stays the sheet transcription until A&A Pack v0.4 arrives):
+
 - **A&A R8** — refined-before-out with a direction claim: keep the honest
   direction words + FLOOR-BLOCKS-CLIMB flag (my draft) vs drop the
   direction label entirely (the sheet voids it).
@@ -36,9 +45,8 @@ is clean for you.)
   own Adjust feedback set Gwyn's Cascade rows to rung 3 ("set the
   direction from an existing system"). The pack currently allows any rung
   on Cascade and the derivation follows the Levels table. Confirm intent.
-- Rule NUMBERING in both packs follows the Plan's reference structure
-  (R1–R11+R10a / R1–R17+R16a) but the content-to-number mapping is my
-  articulation — confirm it matches how you'd cite them.
+- A&A rule NUMBERING (R1–R17+R16a) is my articulation — confirm it
+  matches how you'd cite them.
 
 ## 3. Derivation parity (GATE-2, blocks P6)
 
@@ -59,12 +67,13 @@ sheet displays "J2 · Mid-early" where the app renders the pair tier
 "J2 → Mid" — same read, different display string. Tell me which string is
 canonical for FR-19.
 
-## 4. OD-2 — fallback reviewers
+## 4. OD-2 — fallback reviewers (now an admin setting, per your ruling)
 
-Thin pool is built and refuses with an OD-2 message until you set names
-(suggested in the BRD: Miles/Ops, Gwyn/A&A). One command each:
-set `fallbackReviewerId` via admin PATCH or tell me the names and I wire
-them as config.
+Set them yourself on the admin page (Tracks → "Fallback reviewer" /
+"Exposure verifier" selects, per track) — no deploy, changeable anytime,
+read at use time. Initial assignments at pilot: your ruling named Miles
+(Ops) and Don (A&A-side) for exposure sign-off; fallback-reviewer names
+are still yours to pick. Create the users first if they don't exist.
 
 ## 5. Google OAuth (deferred earlier)
 
