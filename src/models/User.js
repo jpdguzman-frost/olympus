@@ -14,6 +14,9 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     roles: [{ type: String, enum: ROLES }],
     track: { type: String, enum: [...TRACK_KEYS, null], default: null },
+    // A2: how this user is named in CAPS (CAPS speaks names, not
+    // emails). Admin-set; unmapped users simply don't join CAPS data.
+    capsName: { type: String, default: null },
     leadId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     active: { type: Boolean, default: true },
   },

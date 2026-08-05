@@ -14,7 +14,9 @@
 
 import { Card } from '../models/Card.js';
 import { Track } from '../models/Track.js';
+import { User } from '../models/User.js';
 import { structureCard, remapClaim, trackReadyForStructuring, StructuringError } from '../services/structurerService.js';
+import { taskScaffold } from '../services/capsService.js';
 import { transition } from '../services/statusMachine.js';
 import { pushCardAudit, recordAudit } from '../services/auditService.js';
 
@@ -133,7 +135,12 @@ export async function structureOne(card, { client } = {}) {
   }
 
   try {
-    const opts = client ? { client } : {};
+    // A2/A3: the CAPS memory scaffold rides along when the talent is
+    // mapped and the project matches. Absent CAPS -> plain answers only.
+    const talent = await User.findById(card.talentId);
+    const capsScaffold = await taskScaffold(talent?.capsName, card.subject.name).catch(() => null);
+
+    const opts = client ? { client, capsScaffold } : { capsScaffold };
     const { claims, followUps, signalsNoted, rejected } = await structureCard(track, card, opts);
 
     card.claims = claims;

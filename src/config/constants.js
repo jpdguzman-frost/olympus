@@ -78,6 +78,13 @@ export const SLA_CHASE_2_DAYS = 8;
 export const SLA_ESCALATE_DAYS = 10;
 
 /**
+ * A1: exposure auto-verifies when the nominee's logged reviews of the
+ * talent's work span this many DISTINCT weeks on the project.
+ * Tunable post-pilot. Below threshold → the sign-off path.
+ */
+export const EXPOSURE_AUTO_VERIFY_WEEKS = 3;
+
+/**
  * A4 draft lifecycle: drafts idle this long archive (never delete),
  * with ONE nudge a week before. Revivable any time.
  */

@@ -33,9 +33,44 @@
     <h1>{{me.name.split(' ')[0]}}'s record</h1>
     <span class="topbar-spacer"></span>
     {{#if isTalent}}
-      <button class="btn btn-primary" on-click="@this.startCard()">Start a card</button>
+      <button class="btn btn-primary" on-click="@this.startCard()">File a project</button>
+      <button class="btn btn-secondary" on-click="@this.openCatchUp()">Catch up</button>
     {{/if}}
   </div>
+
+  {{#if catchUpVisible}}
+    <section>
+      <div class="section-label">Catch up — projects with no card yet</div>
+      <div class="shell-form">
+        <p class="muted" style="font-size: var(--text-sm); margin-bottom: 0.75rem;">
+          These are your projects from CAPS that have no card. Pick one — it opens the same card flow.
+        </p>
+        <div class="form-row">
+          <label class="field">
+            <span class="field-name">From</span>
+            <input type="date" value="{{catchUpFrom}}" />
+          </label>
+          <label class="field">
+            <span class="field-name">To</span>
+            <input type="date" value="{{catchUpTo}}" />
+          </label>
+          <button class="btn btn-secondary" style="align-self: flex-end;" on-click="@this.loadCatchUp()">Look</button>
+        </div>
+        {{#if catchUpProjects.length}}
+          {{#each catchUpProjects}}
+            <div class="record-meta" style="padding: 0.5rem 0; border-top: 1px solid var(--rule); align-items: center;">
+              <strong style="color: var(--ink); font-family: var(--sans);">{{.projectName}}</strong>
+              {{#if .tenure}}<span>you were on it {{fmtDate(.tenure.from)}} – {{fmtDate(.tenure.to)}}</span>{{/if}}
+              <span class="spacer"></span>
+              <button class="btn btn-primary" on-click="@this.fileCatchUp(this)">File this one</button>
+            </div>
+          {{/each}}
+        {{elseif catchUpLoaded}}
+          <div class="empty-state">Nothing to catch up on in this range — every project has a card, or CAPS has no rows for you.</div>
+        {{/if}}
+      </div>
+    </section>
+  {{/if}}
 
   {{#if isTalent}}
     <section>

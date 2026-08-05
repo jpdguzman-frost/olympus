@@ -74,6 +74,21 @@
     </section>
 
     <section>
+      <div class="section-label">CAPS data</div>
+      {{#if capsStatus}}
+        <p class="muted" style="font-size: var(--text-sm);">
+          {{capsStatus.rowCount}} task rows from “{{capsStatus.source}}”, covering {{fmtDate(capsStatus.windowStart)}} – {{fmtDate(capsStatus.windowEnd)}}.
+          Only task names, categories, projects, reviewer names and dates came in — everything else was dropped at the door.
+        </p>
+      {{else}}
+        <p class="muted" style="font-size: var(--text-sm);">
+          No CAPS data loaded. The app works without it — picks just always need a human check.
+          Load with: <code>npm run import-caps -- &lt;csvFile&gt;</code>
+        </p>
+      {{/if}}
+    </section>
+
+    <section>
       <div class="section-label">Pending verdicts <span class="count">{{pendingVerdicts.length}}</span></div>
       {{#if pendingVerdicts.length}}
         <div class="table-scroll">
@@ -219,7 +234,7 @@
       <div class="table-scroll">
         <table class="ledger">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Roles</th><th>Track</th><th>Status</th><th></th></tr>
+            <tr><th>Name</th><th>Email</th><th>Roles</th><th>Track</th><th>Name in CAPS</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {{#each users}}
@@ -228,6 +243,11 @@
                 <td class="meta">{{.email}}</td>
                 <td><span class="chip-row">{{#each .roles}}<span class="role-chip">{{this}}</span>{{/each}}</span></td>
                 <td class="meta">{{#if .track}}{{.track}}{{else}}—{{/if}}</td>
+                <td>
+                  <input type="text" value="{{.capsName}}" placeholder="as written in CAPS"
+                    style="font-size: var(--text-xs); font-family: var(--mono); width: 11rem;"
+                    on-change="@this.saveCapsName(this)" />
+                </td>
                 <td class="meta">{{#if .active}}active{{else}}inactive{{/if}}</td>
                 <td>
                   <button class="btn btn-quiet" on-click="@this.toggleActive(this)">

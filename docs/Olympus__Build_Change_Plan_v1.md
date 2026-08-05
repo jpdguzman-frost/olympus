@@ -1,7 +1,6 @@
 # Olympus — Build-Change Plan v1 (Amendment 1 + Rulings C1–C9)
 
-Date: Aug 5, 2026 · Status: PENDING JP APPROVAL — no code changes
-until approved. Governed by: Intake Amendment 1 +
+Date: Aug 5, 2026 · Status: APPROVED Aug 5; ALL SIX PACKAGES BUILT Aug 5. Governed by: Intake Amendment 1 +
 Olympus__Rulings_2026-08-05.md > Aug 3 documents. Invariants in
 force throughout; verdict sovereignty absolute.
 
@@ -145,7 +144,7 @@ Touches: `Card`, `structurerService` (re-map mode),
 `cardService`/`confirmService`, new archive worker, talent frontend,
 capture/structurer/confirmFlow tests. Est. 4d.
 
-## B5 — CAPS integration (A2; REVISED Aug 5 per JP: CSV side build)
+## B5 — CAPS integration (A2; CSV side build) — **DONE Aug 5**
 
 Source of record for now: JP's cleaned CSV extract from the
 `../caps-analysis` project (H1 2026 window, Jan 5 – Jul 10, ~26k
@@ -197,7 +196,7 @@ Touches: new `capsService` + import script + mirror collection,
 User.capsName + admin UI, `confirmService` exposure check, capture,
 new test class. Est. 3d.
 
-## B6 — Two-door capture (A3; biggest UX reshape, depends on B5)
+## B6 — Two-door capture (A3) — **DONE Aug 5**
 
 1. **Door 1 "File a project"** (default, at close) and **Door 2
    "Catch up"** (date-range entry listing CAPS projects with no

@@ -18,6 +18,12 @@ const app = new Ractive({
     home: { confirmed: [], drafts: [], archived: [], inFlight: [], track: null },
     queue: [],
     signoffs: [],
+    catchUpVisible: false,
+    catchUpFrom: '',
+    catchUpTo: '',
+    catchUpProjects: [],
+    catchUpLoaded: false,
+    capsContext: null,
     ladder: null,
     quarters: {},
     quarterTags: [],
@@ -65,6 +71,44 @@ const app = new Ractive({
   async startCard() {
     const card = await api('POST', '/api/cards', {});
     window.location.hash = `#/card/${card._id}`;
+  },
+
+  // Door 2 (A3): a date-range entry screen — navigation, never a capture mode.
+  async openCatchUp() {
+    const now = new Date();
+    const from = new Date(now.getTime() - 183 * 24 * 60 * 60 * 1000);
+    this.set({
+      catchUpVisible: !this.get('catchUpVisible'),
+      catchUpFrom: from.toISOString().slice(0, 10),
+      catchUpTo: now.toISOString().slice(0, 10),
+    });
+    if (this.get('catchUpVisible')) await this.loadCatchUp();
+  },
+
+  async loadCatchUp() {
+    this.set({ error: null });
+    try {
+      const projects = await api(
+        'GET',
+        `/api/caps/catch-up?from=${this.get('catchUpFrom')}&to=${this.get('catchUpTo')}`,
+      );
+      this.set({ catchUpProjects: projects, catchUpLoaded: true });
+    } catch (err) {
+      this.set('error', err.message);
+    }
+  },
+
+  async fileCatchUp(project) {
+    this.set({ error: null });
+    try {
+      const card = await api('POST', '/api/cards', {
+        subjectName: project.projectName,
+        closeDate: project.tenure?.to ? String(project.tenure.to).slice(0, 10) : null,
+      });
+      window.location.hash = `#/card/${card._id}`;
+    } catch (err) {
+      this.set('error', err.message);
+    }
   },
 
   openCard(id) {
@@ -359,6 +403,9 @@ async function loadCapture(cardId) {
   }
   const answeredIdx = answers.reduce((acc, a, i) => ((a || '').trim() ? i : acc), 0);
   const context = await api('GET', '/api/cards/context');
+  const capsContext = card.subject.name
+    ? await api('GET', `/api/caps/context?project=${encodeURIComponent(card.subject.name)}`).catch(() => null)
+    : null;
 
   app.set({
     view: 'capture',
@@ -366,6 +413,7 @@ async function loadCapture(cardId) {
     track,
     questions: track.questionSet || [],
     context: context.filter((c) => c._id !== card._id),
+    capsContext,
     mode: card.captureMode === 'single-pass' ? 'single-pass' : 'guided',
     guidedIndex: Math.max(answeredIdx, 0),
     answers,

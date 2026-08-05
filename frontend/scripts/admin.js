@@ -14,6 +14,7 @@ const app = new Ractive({
     audit: [],
     calibration: [],
     pendingVerdicts: [],
+    capsStatus: null,
     statusLabel,
     roleOptions: ['talent', 'lead', 'nonadvocate', 'admin'],
     newUser: { name: '', email: '', roles: [], track: '', leadId: '' },
@@ -77,6 +78,16 @@ const app = new Ractive({
       await api('POST', `/api/admin/cards/${row._id}/nudge`);
       this.set('notice', `Nudged ${row.reviewerName}.`);
       await refresh();
+    } catch (err) {
+      this.set('error', err.message);
+    }
+  },
+
+  async saveCapsName(user) {
+    this.set({ error: null, notice: null });
+    try {
+      await api('PATCH', `/api/admin/users/${user._id}`, { capsName: user.capsName || null });
+      this.set('notice', `${user.name} ↔ CAPS name saved.`);
     } catch (err) {
       this.set('error', err.message);
     }
@@ -149,12 +160,13 @@ const app = new Ractive({
 });
 
 async function refresh() {
-  const [users, tracks, audit, calibration, pendingVerdicts] = await Promise.all([
+  const [users, tracks, audit, calibration, pendingVerdicts, capsStatus] = await Promise.all([
     api('GET', '/api/admin/users'),
     api('GET', '/api/admin/tracks'),
     api('GET', '/api/admin/audit'),
     api('GET', '/api/admin/calibration'),
     api('GET', '/api/admin/pending-verdicts'),
+    api('GET', '/api/admin/caps-status').catch(() => null),
   ]);
   app.set({
     users,
@@ -162,6 +174,7 @@ async function refresh() {
     audit: audit.slice(0, 25),
     calibration,
     pendingVerdicts,
+    capsStatus,
     leads: users.filter((u) => u.roles.includes('lead') && u.active),
     activeUsers: users.filter((u) => u.active),
   });

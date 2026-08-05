@@ -54,10 +54,11 @@ router.patch('/api/admin/users/:id', async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) throw notFound('User not found');
-    const before = { name: user.name, roles: [...user.roles], track: user.track, leadId: user.leadId, active: user.active };
+    const before = { name: user.name, roles: [...user.roles], track: user.track, leadId: user.leadId, active: user.active, capsName: user.capsName };
 
-    const { name, roles, track, leadId, active } = req.body ?? {};
+    const { name, roles, track, leadId, active, capsName } = req.body ?? {};
     if (name !== undefined) user.name = name;
+    if (capsName !== undefined) user.capsName = capsName || null;
     if (roles !== undefined) {
       if (!roles.every((r) => ROLES.includes(r))) throw badRequest('Unknown role');
       user.roles = roles;
@@ -286,6 +287,16 @@ router.get('/api/admin/signals', async (req, res, next) => {
         signalsNoted: c.signalsNoted,
       })),
     );
+  } catch (err) {
+    next(err);
+  }
+});
+
+// A2: CAPS import status — batch metadata only, no task data.
+router.get('/api/admin/caps-status', async (req, res, next) => {
+  try {
+    const { currentBatch } = await import('../services/capsService.js');
+    sendSuccess(res, await currentBatch());
   } catch (err) {
     next(err);
   }

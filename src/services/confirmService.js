@@ -261,15 +261,42 @@ export async function submitNomination(actor, cardId, { nomineeId = null, nomine
     throw badRequest('A system check returned your pick', { failures });
   }
 
+  const nominee = nomineeUsers[0];
+  card.nomination.nominees = [{ userId: nominee._id, name: nominee.name, role: 'confirmer' }];
+  card.nomination.thinPool = false;
+  card.nomination.exposureSignoff = { decision: null, note: null, reason: null, by: null, at: null };
+
+  // A1/A2: exposure auto-verifies from CAPS — the nominee's logged
+  // reviews of the talent's work span 3+ distinct weeks on this
+  // project. Weeks of exposure, never review-count-as-authority. No
+  // CAPS record or below threshold → the human sign-off path.
+  const { reviewExposure } = await import('./capsService.js');
+  const exposure = await reviewExposure(actor.capsName, nominee.capsName, card.subject.name);
+  if (exposure.verified) {
+    card.nomination.systemChecks = {
+      advocateBlock: 'passed',
+      exposure: `auto-verified — they reviewed this work across ${exposure.weeks} different weeks (CAPS)`,
+    };
+    card.nomination.routedTo = nominee._id;
+    card.nomination.routedAt = new Date();
+    card.nomination.repeatStreak = (await repeatStreakFor(card.talentId, nominee._id)) + 1;
+    pushCardAudit(card, {
+      by: actor._id,
+      action: 'nomination-submitted',
+      after: { nominees: [nominee.name], exposure: card.nomination.systemChecks.exposure },
+    });
+    await transition(card, 'routed', actor._id, `exposure auto-verified from CAPS — routed to ${nominee.name}`);
+    await card.save();
+    await recordAudit({ actorId: actor._id, action: 'card.nomination-submitted', entity: 'card', entityId: card._id });
+    return card;
+  }
+
   const track = await Track.findOne({ key: card.track });
   if (!track.exposureVerifierId) {
     throw conflict('No one is set up to check picks on this track yet — ask JP');
   }
 
-  card.nomination.nominees = nomineeUsers.map((u) => ({ userId: u._id, name: u.name, role: 'confirmer' }));
-  card.nomination.thinPool = false;
   card.nomination.systemChecks = { advocateBlock: 'passed', exposure: 'awaiting sign-off' };
-  card.nomination.exposureSignoff = { decision: null, note: null, reason: null, by: null, at: null };
   pushCardAudit(card, {
     by: actor._id,
     action: 'nomination-submitted',

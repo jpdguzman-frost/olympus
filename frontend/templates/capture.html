@@ -14,6 +14,21 @@
     </p>
   {{/if}}
 
+  {{#if capsContext && capsContext.tasks.length}}
+    <div class="context-strip">
+      <div class="context-title">From CAPS — memory only, never evidence</div>
+      {{#if capsContext.tenure}}
+        <div class="note" style="margin-bottom: 0.4rem;">CAPS shows you on this project {{fmtDate(capsContext.tenure.from)}} – {{fmtDate(capsContext.tenure.to)}} — does that match?</div>
+      {{/if}}
+      <ul>
+        {{#each capsContext.tasks}}
+          <li><span class="meta">{{fmtDate(.date)}}</span> {{.taskName}}{{#if .category}} <span class="meta">· {{.category}}</span>{{/if}}</li>
+        {{/each}}
+      </ul>
+      <div class="note">Just to jog your memory. Only what you write below counts.</div>
+    </div>
+  {{/if}}
+
   {{#if context.length}}
     <div class="context-strip">
       <div class="context-title">Your past cards — just for reference</div>
@@ -81,6 +96,7 @@
       <p class="sweep-hint">
         Anything else you own here that didn't come up?
         “Not me” is a fine answer. It costs you nothing.
+        If you say yes to something, add one detail — what, where, since when. A bare yes can't become a claim.
         {{#if !track.competencyOrDomainList.length}}
           <br /><span class="meta">The full checklist shows up once the pack is loaded.</span>
         {{/if}}

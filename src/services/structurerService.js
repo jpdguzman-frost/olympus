@@ -153,7 +153,7 @@ export function buildOutputSchema(track) {
   };
 }
 
-function renderCardInput(card) {
+function renderCardInput(card, capsScaffold = null) {
   const answers = card.rawAnswers
     .map((a) =>
       a.questionIndex === null || a.questionIndex === undefined
@@ -164,7 +164,7 @@ function renderCardInput(card) {
   const sweeps = card.sweepAnswers
     .map((s) => `SWEEP PROMPT: ${s.prompt}\nSWEEP ANSWER: ${s.answer}`)
     .join('\n\n');
-  return [
+  const parts = [
     `SUBJECT (${card.subject.kind}): ${card.subject.name}`,
     `CLOSE DATE: ${card.closeDate ? card.closeDate.toISOString().slice(0, 10) : 'not set'}`,
     '',
@@ -173,7 +173,41 @@ function renderCardInput(card) {
     '',
     'COVERAGE SWEEP:',
     sweeps,
-  ].join('\n');
+  ];
+  // A2/A3: the CAPS memory scaffold — whitelisted task names, categories
+  // and dates ONLY. It is context and a date source, NEVER evidence:
+  // claims come from the talent's words alone, and quotes must be theirs.
+  if (capsScaffold?.tasks?.length) {
+    parts.push(
+      '',
+      'CAPS MEMORY SCAFFOLD (context only — NEVER evidence; no value data exists here):',
+      `Project tenure per CAPS: ${capsScaffold.tenure ? `${capsScaffold.tenure.from?.toISOString().slice(0, 10)} to ${capsScaffold.tenure.to?.toISOString().slice(0, 10)}` : 'unknown'}`,
+      ...capsScaffold.tasks.map(
+        (t) => `- ${t.date ? t.date.toISOString().slice(0, 10) : 'undated'} · ${t.category ?? 'uncategorized'} · ${t.taskName}`,
+      ),
+    );
+  }
+
+  // Mechanical task frame — PLUMBING, not behavior (the behavior spec is
+  // versioned data and stays verbatim). The spec is written for a live
+  // back-and-forth; this tells the model it is the one-shot structuring
+  // step of that same pipeline. Flagged to JP for a possible one-shot
+  // section in the spec at GATE-1.
+  parts.push(
+    '',
+    'THE TASK, NOW: you are the structuring step of the pipeline your rules describe.',
+    'This is a FILED card, not a live chat — the talent is not present to answer you here.',
+    'The capture already happened: the plain four questions above WERE asked and answered.',
+    'If no CAPS scaffold appears above, that only means no scaffold exists — the answers are still the complete input. Structure them.',
+    'In one pass, apply your rules to the raw answers above:',
+    '- Draft EVERY claim their words support, each at the lowest plausible reading, controlled vocabulary only.',
+    '- Every claim carries its traceback: sourceQuote must be an EXACT verbatim substring of their answers.',
+    '- anchor: the account + date/period IN THEIR WORDS (empty string if they never said one).',
+    '- Note upward signals they did not claim (signalsNoted), each with its exact verbatim quote.',
+    '- followUps: the anchor/clarifier questions you would ask, within your question budget — they will be relayed to the talent.',
+    'Output only the schema. Never a level, never a score.',
+  );
+  return parts.join('\n');
 }
 
 /**
@@ -181,7 +215,7 @@ function renderCardInput(card) {
  * Throws StructuringError on refusal/AI failure — the caller leaves the
  * card in draft with raw intact (Invariant 15 / AC-8).
  */
-export async function structureCard(track, card, { client = getClient() } = {}) {
+export async function structureCard(track, card, { client = getClient(), capsScaffold = null } = {}) {
   if (!trackReadyForStructuring(track)) {
     throw new StructuringError('awaiting-pack', `Track "${track.key}" has no vocabulary pack loaded`);
   }
@@ -190,7 +224,7 @@ export async function structureCard(track, card, { client = getClient() } = {}) 
     model: MODEL,
     max_tokens: 16000,
     system: composeSystemPrompt(track),
-    messages: [{ role: 'user', content: renderCardInput(card) }],
+    messages: [{ role: 'user', content: renderCardInput(card, capsScaffold) }],
     output_config: { format: { type: 'json_schema', schema: buildOutputSchema(track) } },
   });
 
@@ -304,10 +338,14 @@ export function validateStructuredOutput(track, card, output) {
     signalsNoted.push({ signal: raw.signal.trim(), sourceQuote: raw.sourceQuote, at: new Date() });
   }
 
-  // FR-9: two clarification follow-ups per card, maximum. Excess is dropped.
+  // A3 question budget (supersedes FR-9's per-card cap): 1 anchor + max
+  // 2 clarifiers PER TOUCHED ROW. Enforced server-side as a ceiling of
+  // 3 x drafted rows (floor of 2 for the no-CAPS four-question path).
+  // Budget spent -> the row stays "insufficient detail - draft".
+  const followUpCap = Math.max(MAX_FOLLOW_UPS, 3 * claims.length);
   const followUps = (Array.isArray(output.followUps) ? output.followUps : [])
     .filter((q) => typeof q === 'string' && q.trim())
-    .slice(0, MAX_FOLLOW_UPS)
+    .slice(0, followUpCap)
     .map((question) => ({ question, answer: null }));
 
   return { claims, followUps, signalsNoted, rejected };

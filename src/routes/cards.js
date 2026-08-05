@@ -202,6 +202,28 @@ router.post('/api/cards/:id/signoff', async (req, res, next) => {
   }
 });
 
+// --- A2/A3: CAPS reads — whitelist mirror only; absent data degrades ---
+
+// Door 2 "Catch up": my CAPS projects with no card yet (navigation, never a capture mode)
+router.get('/api/caps/catch-up', async (req, res, next) => {
+  try {
+    const { catchUpProjects } = await import('../services/capsService.js');
+    sendSuccess(res, await catchUpProjects(req.currentUser, { from: req.query.from, to: req.query.to }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Memory scaffold for capture: my own tasks on this project — context, never evidence
+router.get('/api/caps/context', async (req, res, next) => {
+  try {
+    const { taskScaffold } = await import('../services/capsService.js');
+    sendSuccess(res, await taskScaffold(req.currentUser.capsName, req.query.project));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- A4: revive an archived draft (nothing was lost) ---
 router.post('/api/cards/:id/revive', async (req, res, next) => {
   try {

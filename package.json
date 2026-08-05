@@ -13,7 +13,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:tz": "TZ=UTC vitest run && TZ=Asia/Manila vitest run",
-    "load-behavior-spec": "node scripts/load-behavior-spec.js"
+    "load-behavior-spec": "node scripts/load-behavior-spec.js",
+    "import-caps": "node scripts/import-caps.js"
   },
   "license": "UNLICENSED",
   "private": true,

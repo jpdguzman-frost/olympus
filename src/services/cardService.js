@@ -21,7 +21,7 @@ import { periodTagFor } from '../utils/periodTag.js';
 import { pushCardAudit, recordAudit } from './auditService.js';
 import { transition } from './statusMachine.js';
 
-const KIND_BY_TRACK = { ops: 'account', artasset: 'project' };
+const KIND_BY_TRACK = { ops: 'project', artasset: 'project' }; // A3: every card is per-project
 
 function assertOwnCard(actor, card) {
   if (!card.talentId.equals(actor._id)) {
