@@ -10,7 +10,7 @@ with its tests green before the next starts.
 
 ---
 
-## B1 — Pack v0.4 + behavior split + role settings (lowest risk)
+## B1 — Pack v0.4 + behavior split + role settings — **DONE Aug 5**
 
 Config and plumbing; no governance-flow behavior changes.
 
@@ -49,7 +49,7 @@ Config and plumbing; no governance-flow behavior changes.
 Touches: `docs/`, `VocabPackVersion`, new model, `structurerService`
 prompt assembly, `routes/admin.js`, admin UI. Est. 2d.
 
-## B2 — Verdict mechanics (A5; additive, server-first)
+## B2 — Verdict mechanics (A5; additive, server-first) — **DONE Aug 5**
 
 1. **Attestation**: Confirmed requires a one-line "what I checked"
    statement; schema field + `applyVerdict` enforcement + reviewer

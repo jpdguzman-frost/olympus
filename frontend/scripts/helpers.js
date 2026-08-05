@@ -9,6 +9,9 @@ const STATUS_LABELS = {
   confirmed: 'Confirmed',
   adjust: 'Needs a fix',
   revised: 'Revised',
+  deadlocked: 'Deadlocked — with JP',
+  ruled: 'JP ruled — back with your reviewer',
+  reassigned: 'With the fallback reviewer',
   archived: 'Archived',
 };
 
@@ -18,9 +21,14 @@ function statusLabel(status) {
 
 function stampClass(status) {
   if (status === 'confirmed') return 'stamp-confirmed';
-  if (status === 'adjust') return 'stamp-adjust';
+  if (status === 'adjust' || status === 'deadlocked') return 'stamp-adjust';
   if (status === 'draft') return 'stamp-draft';
   return 'stamp-inflight';
+}
+
+/** Pack §B4: Pending · Adjust · Confirmed — null renders as Pending. */
+function verdictLabel(verdict) {
+  return verdict || 'Pending';
 }
 
 function answeredCount(card) {
@@ -41,6 +49,15 @@ const FLAG_NUDGES = {
   'PROPOSED-BOLT-IN': 'This extra skill isn’t on the recognized list — it’s recorded, and JP will look at it.',
   'THIN-POOL': 'This went through the fallback path because no valid confirmer existed.',
   'NOT-TRIGGERED': 'Nothing on record here — that’s a valid state, not a gap.',
+  /* Pack v0.4 §B8 claim-level flags (A4: talent-facing language never blames). */
+  'Floor met': 'The floor holds on its own — nobody has to check behind you.',
+  'Call not owned': 'The call sat elsewhere here — recorded honestly, and that’s fine.',
+  "did not make the call — doesn't lift level": 'You did the work; someone else made the call. It counts — it just doesn’t lift the level.',
+  'No disruption on record — not a gap': 'Nothing disrupted the flow on your watch — a valid state, not a gap.',
+  'insufficient detail — draft': 'Kept as draft — add the missing detail anytime; nothing is lost.',
+  'signal noted, not claimed': 'A signal you chose not to claim is noted — no pressure; your reviewer can still raise it.',
+  'not yet reached — not a gap': 'Not part of your work yet — a valid state, not a gap.',
+  "designed, not held — doesn't lift level": 'You designed it, but the project didn’t run on it — recorded; it doesn’t lift the level.',
 };
 
 function flagNudge(flag) {

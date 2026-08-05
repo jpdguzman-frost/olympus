@@ -220,7 +220,7 @@ describe('verdict — Invariant 3: assigned non-advocate ONLY', () => {
     const claimId = routedCard.claims[0]._id.toString();
     return agent
       .post(`/api/cards/${routedCard._id}/claims/${claimId}/verdict`)
-      .send({ verdict: 'Confirmed' });
+      .send({ verdict: 'Confirmed', note: 'checked the weekly build records myself' }); // A5 attestation
   }
 
   it('the talent cannot write a verdict on their own card', async () => {

@@ -13,6 +13,8 @@ const app = new Ractive({
     tracks: [],
     audit: [],
     calibration: [],
+    pendingVerdicts: [],
+    statusLabel,
     roleOptions: ['talent', 'lead', 'nonadvocate', 'admin'],
     newUser: { name: '', email: '', roles: [], track: '', leadId: '' },
     fmtDate,
@@ -48,6 +50,32 @@ const app = new Ractive({
     this.set({ error: null, notice: null });
     try {
       await api('PATCH', `/api/admin/users/${user._id}`, { active: !user.active });
+      await refresh();
+    } catch (err) {
+      this.set('error', err.message);
+    }
+  },
+
+  async sendRuling(row) {
+    this.set({ error: null, notice: null });
+    try {
+      if (!(row.rulingText || '').trim()) {
+        this.set('error', 'Write the ruling first — it goes on the record.');
+        return;
+      }
+      await api('POST', `/api/admin/cards/${row._id}/ruling`, { text: row.rulingText });
+      this.set('notice', 'Ruling recorded — guidance, not a verdict. The reviewer re-reviews with it in view.');
+      await refresh();
+    } catch (err) {
+      this.set('error', err.message);
+    }
+  },
+
+  async nudgeCard(row) {
+    this.set({ error: null, notice: null });
+    try {
+      await api('POST', `/api/admin/cards/${row._id}/nudge`);
+      this.set('notice', `Nudged ${row.reviewerName}.`);
       await refresh();
     } catch (err) {
       this.set('error', err.message);
@@ -121,17 +149,19 @@ const app = new Ractive({
 });
 
 async function refresh() {
-  const [users, tracks, audit, calibration] = await Promise.all([
+  const [users, tracks, audit, calibration, pendingVerdicts] = await Promise.all([
     api('GET', '/api/admin/users'),
     api('GET', '/api/admin/tracks'),
     api('GET', '/api/admin/audit'),
     api('GET', '/api/admin/calibration'),
+    api('GET', '/api/admin/pending-verdicts'),
   ]);
   app.set({
     users,
     tracks,
     audit: audit.slice(0, 25),
     calibration,
+    pendingVerdicts,
     leads: users.filter((u) => u.roles.includes('lead') && u.active),
     activeUsers: users.filter((u) => u.active),
   });

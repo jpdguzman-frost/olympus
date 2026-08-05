@@ -253,7 +253,18 @@ export async function submitForStructuring(actor, cardId) {
  * The check is assignment-based: admin, lead, JP, and any other role are
  * rejected identically. This is the server law the role matrix row
  * "Verdict → N N Y(assigned only) N" describes.
+ *
+ * A5: Confirmed requires a one-line attestation of what was checked;
+ * Adjust requires its note. Both live in verdictNote — stored, audited,
+ * spot-checkable.
+ *
+ * C1: verdicts are also writable in 'ruled' (reviewer re-reviews with
+ * JP's ruling in view) and 'reassigned' (fallback reviewer). A reviewer
+ * holding Adjust on a DEFENDED claim in 'routed' deadlocks the card —
+ * both final positions logged permanently.
  */
+const REVIEWABLE_STATUSES = ['routed', 'ruled', 'reassigned'];
+
 export async function applyVerdict(actor, cardId, claimId, { verdict, note = null }) {
   const card = await Card.findById(cardId);
   if (!card) throw notFound('Card not found');
@@ -262,10 +273,15 @@ export async function applyVerdict(actor, cardId, claimId, { verdict, note = nul
   if (!routedTo || !routedTo.equals(actor._id)) {
     throw forbidden('Only the card\'s assigned reviewer can write a verdict');
   }
-  if (card.status !== 'routed') throw conflict(`Card is not reviewable in status "${card.status}"`);
+  if (!REVIEWABLE_STATUSES.includes(card.status)) {
+    throw conflict(`Card is not reviewable in status "${card.status}"`);
+  }
   if (!['Confirmed', 'Adjust'].includes(verdict)) throw badRequest('Verdict is Confirmed or Adjust');
   if (verdict === 'Adjust' && !note?.trim()) {
     throw badRequest('Adjust requires a note — it returns the card to the talent');
+  }
+  if (verdict === 'Confirmed' && !note?.trim()) {
+    throw badRequest('Confirmed requires a one-line attestation: what did you check?');
   }
 
   const claim = card.claims.id(claimId);
@@ -277,7 +293,7 @@ export async function applyVerdict(actor, cardId, claimId, { verdict, note = nul
   claim.verdictBy = actor._id;
   claim.verdictAt = new Date();
   // BR-7: Adjust returns the claim to the talent — their prior approval
-  // no longer stands; revision requires a fresh approve or fix.
+  // no longer stands; revision requires a fresh approve, fix, or defence.
   if (verdict === 'Adjust') claim.talentApproved = false;
   pushCardAudit(card, {
     by: actor._id,
@@ -292,7 +308,29 @@ export async function applyVerdict(actor, cardId, claimId, { verdict, note = nul
   const allDecided = card.claims.every((c) => c.verdict !== null);
   if (allDecided) {
     const anyAdjust = card.claims.some((c) => c.verdict === 'Adjust');
-    await transition(card, anyAdjust ? 'adjust' : 'confirmed', actor._id);
+    // C1 deadlock: the reviewer held Adjust on a claim the talent defended.
+    const heldOnDefended =
+      card.status === 'routed' &&
+      card.claims.some((c) => c.verdict === 'Adjust' && c.defenseStatement);
+    if (heldOnDefended) {
+      const positions = card.claims
+        .filter((c) => c.verdict === 'Adjust' && c.defenseStatement)
+        .map((c) => ({
+          claim: c.competencyOrDomain,
+          talentFinalPosition: c.defenseStatement,
+          reviewerFinalPosition: c.verdictNote,
+        }));
+      card.deadlockedAt = new Date();
+      pushCardAudit(card, {
+        by: actor._id,
+        action: 'deadlocked',
+        after: { positions },
+        note: 'talent defends, reviewer holds — escalates to JP as non-partisan judge (C1); both final positions logged permanently',
+      });
+      await transition(card, 'deadlocked', actor._id);
+    } else {
+      await transition(card, anyAdjust ? 'adjust' : 'confirmed', actor._id);
+    }
   }
 
   await card.save();

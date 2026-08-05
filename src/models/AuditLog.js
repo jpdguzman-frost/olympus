@@ -8,7 +8,7 @@ import mongoose from 'mongoose';
 
 const auditLogSchema = new mongoose.Schema(
   {
-    actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // null = system (SLA worker)
     action: { type: String, required: true },
     entity: { type: String, required: true },
     entityId: { type: mongoose.Schema.Types.ObjectId, default: null },

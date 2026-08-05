@@ -138,7 +138,9 @@ describe('verdict → adjust → revise → re-route (FR-16, BR-7)', () => {
     expect(rerouted.body.data.nomination.routedTo).toBe(ctx.users.reviewer._id.toString()); // same reviewer
 
     // Reviewer confirms this time → card confirms
-    const confirmed = await agents.reviewer.post(`/api/cards/${card._id}/claims/${claimId}/verdict`).send({ verdict: 'Confirmed' });
+    const confirmed = await agents.reviewer
+      .post(`/api/cards/${card._id}/claims/${claimId}/verdict`)
+      .send({ verdict: 'Confirmed', note: 'verified against the revised labels' }); // A5 attestation
     expect(confirmed.body.data.status).toBe('confirmed');
   });
 });

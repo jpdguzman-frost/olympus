@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { Track } from '../models/Track.js';
 import * as cards from '../services/cardService.js';
 import * as confirm from '../services/confirmService.js';
+import * as verdictFlow from '../services/verdictService.js';
 import { sendSuccess } from '../utils/responseEnvelope.js';
 
 const router = Router();
@@ -204,6 +205,16 @@ router.post('/api/cards/:id/reroute', async (req, res, next) => {
 router.post('/api/cards/:id/claims/:claimId/verdict', async (req, res, next) => {
   try {
     sendSuccess(res, await cards.applyVerdict(req.currentUser, req.params.id, req.params.claimId, req.body ?? {}));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- C1: the assigned reviewer refuses after JP's ruling — final position
+// logged permanently; the card auto-reassigns to the fallback reviewer.
+router.post('/api/cards/:id/refuse-ruling', async (req, res, next) => {
+  try {
+    sendSuccess(res, await verdictFlow.refuseAfterRuling(req.currentUser, req.params.id, req.body?.statement));
   } catch (err) {
     next(err);
   }

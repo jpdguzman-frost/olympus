@@ -37,14 +37,35 @@ async function ownStructuredCard(actor, cardId, statuses = ['structured']) {
 // FR-12 — per-claim approve / fix
 // ---------------------------------------------------------------------------
 
-export async function decideClaim(actor, cardId, claimId, { action, labels, remove } = {}) {
+export async function decideClaim(actor, cardId, claimId, { action, labels, remove, statement, concessionReason } = {}) {
   const card = await ownStructuredCard(actor, cardId, ['structured', 'adjust']);
   const claim = card.claims.id(claimId);
   if (!claim) throw notFound('Claim not found');
   const before = claim.toObject();
 
+  // Intent v2: concession costs more than defence — downgrading or
+  // removing a DEFENDED claim requires a stated reason; the original
+  // state stays side-by-side in the audit entry.
+  const conceding = action === 'fix' && claim.defenseStatement;
+  if (conceding && !concessionReason?.trim()) {
+    throw badRequest('You defended this claim — changing it now needs a stated reason, on the record');
+  }
+
   if (action === 'approve') {
     claim.talentApproved = true;
+  } else if (action === 'defend') {
+    // C1: the talent stands by an adjusted claim unchanged. The defence
+    // goes on the record; if the reviewer holds Adjust again, the card
+    // deadlocks and escalates to JP as non-partisan judge.
+    if (card.status !== 'adjust' || claim.verdict !== 'Adjust') {
+      throw conflict('Only a claim your reviewer adjusted can be defended');
+    }
+    if (!statement?.trim()) {
+      throw badRequest('Say why the claim stands as written — your defence goes on the record');
+    }
+    claim.defenseStatement = statement.trim();
+    claim.defendedAt = new Date();
+    claim.talentApproved = true; // the defence re-affirms the claim as written
   } else if (action === 'fix') {
     if (remove) {
       // The talent's fix can be "this isn't mine" — the claim goes, audited.
@@ -62,9 +83,14 @@ export async function decideClaim(actor, cardId, claimId, { action, labels, remo
         throw badRequest(`Fix rejected by the validation layer: ${rejected[0]?.reason ?? 'unknown'}`);
       }
       Object.assign(claim, claims[0], { talentApproved: true });
+      if (conceding) {
+        claim.concessionReason = concessionReason.trim();
+        claim.defenseStatement = null; // conceded — a later Adjust is not a deadlock
+        claim.defendedAt = null;
+      }
     }
   } else {
-    throw badRequest('action is approve or fix');
+    throw badRequest('action is approve, fix, or defend');
   }
 
   pushCardAudit(card, {
@@ -72,6 +98,7 @@ export async function decideClaim(actor, cardId, claimId, { action, labels, remo
     action: `claim-${remove ? 'removed' : action}`,
     before,
     after: remove ? null : card.claims.id(claimId)?.toObject(),
+    note: conceding ? `concession after defence: ${concessionReason.trim()}` : null,
   });
   await card.save();
   await recordAudit({
@@ -293,6 +320,7 @@ export async function decideNomination(actor, cardId, { action, reason = null, a
 
   card.nomination.leadDecision = { action: 'approve', reason, by: actor._id, at: new Date() };
   card.nomination.routedTo = chosen.userId;
+  card.nomination.routedAt = new Date(); // A5: the SLA clock starts here
   card.nomination.repeatStreak = (await repeatStreakFor(card.talentId, chosen.userId)) + 1;
   pushCardAudit(card, { by: actor._id, action: 'nominee-approve', note: `routed to ${chosen.name}` });
   await transition(card, 'routed', actor._id, `routed to ${chosen.name}`);
@@ -321,7 +349,9 @@ export async function rerouteAfterRevision(actor, cardId) {
   }
 
   // BR-7: Adjust requires revision and re-review — cleared verdicts go
-  // back to the same reviewer; Confirmed verdicts stand.
+  // back to the same reviewer; Confirmed verdicts stand. A defence
+  // (C1) stays on the claim: if the reviewer holds Adjust on it again,
+  // the card deadlocks.
   for (const claim of card.claims) {
     if (claim.verdict === 'Adjust') {
       claim.verdict = null;
@@ -330,6 +360,7 @@ export async function rerouteAfterRevision(actor, cardId) {
       claim.verdictAt = null;
     }
   }
+  card.nomination.routedAt = new Date(); // A5: the SLA clock restarts on re-route
   await transition(card, 'revised', actor._id, 'talent revised after Adjust');
   await transition(card, 'routed', actor._id, 're-routed to the same reviewer');
   await card.save();

@@ -47,6 +47,7 @@ const app = new Ractive({
     nomineePick: [],
     notice: null,
     actionError: null,
+    refuseText: '',
     // helpers usable in templates
     statusLabel,
     stampClass,
@@ -126,11 +127,30 @@ const app = new Ractive({
     const picked = this.get(`card.claims.${index}.editLabels`) || {};
     const labels = {};
     for (const [field, value] of Object.entries(picked)) if (value) labels[field] = value;
-    await this.claimAction(claim, { action: 'fix', labels });
+    await this.claimAction(claim, { action: 'fix', labels, concessionReason: claim.concessionText || null });
   },
 
   async removeClaim(claim) {
-    await this.claimAction(claim, { action: 'fix', remove: true });
+    await this.claimAction(claim, { action: 'fix', remove: true, concessionReason: claim.concessionText || null });
+  },
+
+  // C1: stand by an adjusted claim as written — the defence goes on the record.
+  async defendClaim(claim) {
+    await this.claimAction(claim, { action: 'defend', statement: claim.defenseText });
+  },
+
+  // C1: post-ruling refusal — final position logged, card goes to the fallback.
+  async refuseRuling() {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/refuse-ruling`, {
+        statement: this.get('refuseText'),
+      });
+      this.set('notice', 'Your final position is on the record. The card moved on without your verdict being written for you.');
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
   },
 
   async claimAction(claim, body) {
@@ -212,7 +232,8 @@ const app = new Ractive({
     try {
       await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/verdict`, {
         verdict,
-        note: claim.adjustNote || null,
+        // A5: Confirmed carries its attestation; Adjust carries its note.
+        note: (verdict === 'Confirmed' ? claim.attestation : claim.adjustNote) || null,
       });
       await this.refreshDetail();
     } catch (err) {
@@ -261,7 +282,10 @@ async function loadCapture(cardId) {
       card,
       track,
       isConfirmScreen: isOwn && !card.inCalibration && ['structured', 'adjust'].includes(card.status),
-      isReviewScreen: card.status === 'routed' && String(card.nomination?.routedTo) === String(me.id),
+      isReviewScreen:
+        ['routed', 'ruled', 'reassigned'].includes(card.status) &&
+        String(card.nomination?.routedTo) === String(me.id),
+      refuseText: '',
       vocabFields: Object.keys(track.controlledVocabulary || {}),
       approvedCount: (card.claims || []).filter((c) => c.talentApproved).length,
       nominating: false,

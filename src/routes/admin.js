@@ -15,6 +15,7 @@ import { AuditLog } from '../models/AuditLog.js';
 import { Card } from '../models/Card.js';
 import { recordAudit } from '../services/auditService.js';
 import * as calibration from '../services/calibrationService.js';
+import * as verdictFlow from '../services/verdictService.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { sendSuccess } from '../utils/responseEnvelope.js';
 import { ROLES, TRACK_KEYS } from '../config/constants.js';
@@ -223,6 +224,43 @@ router.post('/api/admin/tracks/:key/calibration-mode', async (req, res, next) =>
       before, after: { calibrationMode: track.calibrationMode },
     });
     sendSuccess(res, track);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * A5 — JP's pending-verdict dashboard + manual nudge; C1 — rulings on
+ * deadlocked cards; C9 hook — packaging deferral. NONE of these writes
+ * a verdict: the verdict field rejects admin (Invariant 3).
+ */
+router.get('/api/admin/pending-verdicts', async (req, res, next) => {
+  try {
+    sendSuccess(res, await verdictFlow.pendingVerdicts(req.currentUser));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/admin/cards/:id/ruling', async (req, res, next) => {
+  try {
+    sendSuccess(res, await verdictFlow.writeRuling(req.currentUser, req.params.id, req.body?.text));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/admin/cards/:id/nudge', async (req, res, next) => {
+  try {
+    sendSuccess(res, await verdictFlow.nudge(req.currentUser, req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/admin/cards/:id/defer-packaging', async (req, res, next) => {
+  try {
+    sendSuccess(res, await verdictFlow.deferPackaging(req.currentUser, req.params.id));
   } catch (err) {
     next(err);
   }

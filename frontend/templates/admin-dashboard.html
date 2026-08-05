@@ -72,6 +72,54 @@
     </section>
 
     <section>
+      <div class="section-label">Pending verdicts <span class="count">{{pendingVerdicts.length}}</span></div>
+      {{#if pendingVerdicts.length}}
+        <div class="table-scroll">
+          <table class="ledger">
+            <thead>
+              <tr><th>Card</th><th>Talent</th><th>Reviewer</th><th>Status</th><th>Aging</th><th>Chases</th><th>Streak</th><th></th></tr>
+            </thead>
+            <tbody>
+              {{#each pendingVerdicts}}
+                <tr>
+                  <td>{{.subject.name}}</td>
+                  <td class="meta">{{.talentName}}</td>
+                  <td class="meta">{{.reviewerName}}{{#if .escalated}} <span class="tag">fallback</span>{{/if}}</td>
+                  <td class="meta">{{statusLabel(.status)}}</td>
+                  <td class="meta">{{.agingWorkingDays}}wd</td>
+                  <td class="meta">{{.chases}}</td>
+                  <td class="meta">{{#if .repeatStreak >= 3}}<span style="color: var(--amber-ink);">{{.repeatStreak}}×</span>{{else}}{{.repeatStreak}}×{{/if}}</td>
+                  <td><button class="btn btn-quiet" on-click="@this.nudgeCard(this)">Nudge</button></td>
+                </tr>
+                {{#if .escalationHalted}}
+                  <tr><td colspan="8"><span class="pending">ESCALATION HALTED — {{.escalationHalted.reason}}. Fix the track's fallback setting, or resolve by hand.</span></td></tr>
+                {{/if}}
+                {{#if .status === 'deadlocked'}}
+                  <tr>
+                    <td colspan="8">
+                      <div class="sweep-actions" style="flex-wrap: wrap;">
+                        <span class="muted" style="font-size: var(--text-xs); width: 100%;">
+                          Both final positions are in the card's audit trail. Your ruling is guidance on the record — never a verdict; the reviewer re-reviews with it in view.
+                        </span>
+                        <input type="text" value="{{.rulingText}}" placeholder="Your ruling, one or two lines" style="flex: 2;" />
+                        <button class="btn btn-primary" on-click="@this.sendRuling(this)">Write ruling</button>
+                      </div>
+                    </td>
+                  </tr>
+                {{/if}}
+              {{/each}}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted" style="font-size: var(--text-xs); margin-top: 0.5rem;">
+          SLA: 10 working days, two automatic chases, then escalation to the track's fallback reviewer. Non-response is never a verdict.
+        </p>
+      {{else}}
+        <div class="empty-state">Nothing pending a verdict.</div>
+      {{/if}}
+    </section>
+
+    <section>
       <div class="section-label">Calibration queue <span class="count">{{calibration.length}}</span></div>
       {{#if calibration.length}}
         {{#each calibration}}
