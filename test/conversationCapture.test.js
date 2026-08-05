@@ -196,6 +196,35 @@ describe('the conversation engine', () => {
     expect(stored.rawAnswers.some((a) => a.answer.includes('Denise'))).toBe(true); // saved verbatim, will feed structuring
   });
 
+  it('a form autosave PATCH can NEVER clobber a conversation card (JP data-loss bug, Aug 5)', async () => {
+    const card = await conversationCard('Clobber Guard Card');
+    const client = makeClient([
+      Q('What is this work?'),
+      Q('Anything else?', 'sweep'),
+      Q('All set — send it in.', 'wrap', true),
+    ]);
+    await converse(talentUser, card._id, { client });
+    await converse(talentUser, card._id, { text: 'I run the board since Jan.', client });
+    await converse(talentUser, card._id, { text: 'Wala na.', client });
+
+    // The old form's autosave payload: empty answers, guided mode, blank name.
+    const res = await agents.talentA.patch(`/api/cards/${card._id}`).send({
+      subjectName: 'Clobber Guard Card',
+      captureMode: 'guided',
+      rawAnswers: [],
+      sweepAnswers: [],
+      closeDate: null,
+    });
+    expect(res.status).toBe(200);
+
+    const stored = await Card.findById(card._id);
+    expect(stored.captureMode).toBe('conversation'); // mode survives
+    expect(stored.rawAnswers).toHaveLength(1); // words survive
+    expect(stored.sweepAnswers).toHaveLength(1); // sweep survives
+    const submit = await agents.talentA.post(`/api/cards/${card._id}/submit`);
+    expect(submit.status).toBe(200); // and it still submits
+  });
+
   it('nobody but the talent converses on their card', async () => {
     const card = await conversationCard('Private Chat');
     const admin = await ctx.loginAs(ctx.users.admin);

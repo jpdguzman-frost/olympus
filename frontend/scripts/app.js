@@ -139,7 +139,7 @@ const app = new Ractive({
   async submitCard() {
     this.set({ submitMessage: null, submitError: null });
     try {
-      await saveNow();
+      if (this.get('card.captureMode') !== 'conversation') await saveNow();
       const result = await api('POST', `/api/cards/${this.get('card._id')}/submit`);
       if (result.structuring === 'pending-p3') {
         this.set(
@@ -497,6 +497,7 @@ let savePromise = null;
 async function saveNow() {
   const card = app.get('card');
   if (!card || card.status !== 'draft') return;
+  if (card.captureMode === 'conversation') return; // B7: turns save server-side, form state is irrelevant
   app.set('saveState', 'saving');
   try {
     const updated = await api('PATCH', `/api/cards/${card._id}`, buildPatch());
@@ -515,6 +516,7 @@ const scheduleSave = debounce(() => {
 
 app.observe('answers.* singleText sweepText subjectName closeDateStr', () => {
   if (app.get('view') !== 'capture') return;
+  if (app.get('card.captureMode') === 'conversation') return;
   refreshDerived();
   scheduleSave();
 }, { init: false });

@@ -166,6 +166,16 @@ export async function updateDraft(actor, cardId, patch = {}) {
     card.closeDate = patch.closeDate ? new Date(patch.closeDate) : null;
     card.periodTag = periodTagFor(card.closeDate);
   }
+  // B7 hard guard: on a conversation card the WORDS live in the
+  // conversation — no form patch may replace answers, the sweep, or the
+  // mode (the JP data-loss bug, Aug 5: a stale form autosave clobbered a
+  // finished conversation at submit time).
+  if (card.captureMode === 'conversation') {
+    pushCardAudit(card, { by: actor._id, action: 'draft-autosave', note: 'conversation card — name/date only' });
+    await card.save();
+    await recordAudit({ actorId: actor._id, action: 'card.update-draft', entity: 'card', entityId: card._id });
+    return card;
+  }
   if (patch.captureMode === 'guided' || patch.captureMode === 'single-pass') {
     card.captureMode = patch.captureMode;
   }
