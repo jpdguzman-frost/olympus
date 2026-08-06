@@ -192,7 +192,9 @@ describe('exposure sign-off — verifier setting only, never substitution (A1/C3
     });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('routed');
-    expect(res.body.data.nomination.routedTo).toBe(ctx.users.reviewer._id.toString());
+    // C2v2: the route (and every line's checker) is the talent's pick, only.
+    expect(res.body.data.nomination.routes[0].reviewerId).toBe(ctx.users.reviewer._id.toString());
+    expect(res.body.data.claims.every((c) => c.checkerId === ctx.users.reviewer._id.toString())).toBe(true);
   });
 
   it('confirming needs the one-line note', async () => {

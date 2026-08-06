@@ -69,7 +69,7 @@
           </div>
           <div class="record-meta">
             {{#if .periodTag}}<span class="tag">{{.periodTag}}</span>{{/if}}
-            <span>{{.talentName}} picked <strong style="color: var(--ink);">{{.nomineeName}}</strong> to confirm this card</span>
+            <span>{{.talentName}} picked <strong style="color: var(--ink);">{{.nomineeName}}</strong> to check {{.lines}} line{{.lines === 1 ? '' : 's'}}</span>
             {{#if .repeatStreak >= 2}}
               <span class="tag" style="color: var(--amber-ink);">same pair {{.repeatStreak}} cards in a row</span>
             {{/if}}
@@ -216,11 +216,14 @@
             </div>
             <div class="record-meta">
               <span class="tag">{{.periodTag}}</span>
-              {{#if .inCalibration}}<span>with JP for a first check</span>{{else}}<span>{{.claims.length}} lines drafted</span>{{/if}}
+              <span>{{.claims.length}} lines from your words</span>
             </div>
             <div class="record-foot">
+              {{#if .status === 'structured'}}
+                <span class="muted" style="font-size: var(--text-sm);">Your write-up is ready. Read it once — one button sends it.</span>
+              {{/if}}
               <span class="spacer"></span>
-              <button class="btn btn-secondary" on-click="@this.openCard(._id)">View</button>
+              <button class="btn {{.status === 'structured' ? 'btn-primary' : 'btn-secondary'}}" on-click="@this.openCard(._id)">{{.status === 'structured' ? 'Check your write-up' : 'View'}}</button>
             </div>
             <span class="stamp {{stampClass(.status)}}">{{statusLabel(.status)}}</span>
           </article>

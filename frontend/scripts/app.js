@@ -47,6 +47,17 @@ const app = new Ractive({
     // detail/confirm state
     isConfirmScreen: false,
     isReviewScreen: false,
+    // C2v2 document screen state
+    isDocScreen: false,
+    isAdjustScreen: false,
+    checkerPick: '',
+    checkerPickName: '',
+    docReady: 0,
+    docAside: 0,
+    docLeftOut: 0,
+    sendSummary: '',
+    needsResend: false,
+    boltInsView: [],
     vocabFields: [],
     approvedCount: 0,
     nominating: false,
@@ -61,6 +72,15 @@ const app = new Ractive({
     answeredCount,
     fmtDate,
     flagNudge,
+    openContention: (claim) => (claim.contentions || []).some((c) => c.outcome === null),
+    hasThreadWords: (t) => (t.thread || []).some((x) => x.role === 'talent'),
+    checkerName: (id) => {
+      const routes = app.get('card.nomination.routes') || [];
+      const hit = routes.find((r) => String(r.reviewerId) === String(id));
+      if (hit) return hit.name;
+      const cand = (app.get('candidates') || []).find((c) => String(c._id) === String(id));
+      return cand ? cand.name : '—';
+    },
   },
 
   async logout() {
@@ -180,38 +200,123 @@ const app = new Ractive({
     await this.claimAction(claim, { action: 'fix', remove: true, concessionReason: claim.concessionText || null });
   },
 
-  // A4: anchor a line — when it was, and where, in the talent's words.
-  async anchorClaim(claim) {
-    await this.claimAction(claim, { action: 'anchor', statement: claim.anchorInput });
+  // --- C2v2 document screen: per-line threads, context, left-out, send ---
+
+  toggleContext(ci) {
+    const claim = this.get(`card.claims.${ci}`);
+    if (!claim.showContext) {
+      this.set(`card.claims.${ci}.contextTurns`, contextTurnsFor(this.get('card'), claim));
+    }
+    this.set(`card.claims.${ci}.showContext`, !claim.showContext);
   },
 
-  // JP's thin-line rule: add the missing piece; the AI re-checks the line.
-  async addDetail(claim) {
+  toggleThread(ci) {
+    this.toggle(`card.claims.${ci}.threadOpen`);
+  },
+
+  toggleLeftOut(ci) {
+    this.toggle(`card.claims.${ci}.leftOut`);
+  },
+
+  async threadSend(claim, ci) {
+    if (!(claim.threadInput || '').trim()) return;
     this.set({ notice: null, actionError: null });
     try {
-      await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/decide`, {
-        action: 'add-detail',
-        statement: claim.detailText,
+      const result = await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/thread`, {
+        text: claim.threadInput,
       });
-      this.set('notice', 'Got it — your detail is saved and the line is being re-checked. The answer lands here in about a minute.');
+      this.set(`card.claims.${ci}.threadInput`, '');
+      this.set(`card.claims.${ci}.thread`, result.thread);
+      if (result.turn.ready) {
+        await this.refreshDetail();
+        pollDetailSoon();
+      }
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  async threadClose(claim) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/thread`, { close: true });
+      this.set('notice', 'Got it — the line is being re-checked against your words. The answer lands on the line in about a minute.');
+      await this.refreshDetail();
+      pollDetailSoon();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  async startBoltIn(item) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/bolt-in`, { competency: item.name });
       await this.refreshDetail();
     } catch (err) {
       this.set('actionError', err.message);
     }
   },
 
-  // A4: contest a line against its traceback — the AI re-checks it.
-  async contestClaim(claim) {
+  async startSignalClaim(sig) {
     this.set({ notice: null, actionError: null });
     try {
-      await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/decide`, {
-        action: 'contest',
-        statement: claim.contestText,
-      });
-      this.set('notice', "Got it — the line is being re-checked against your words. The answer lands here in about a minute.");
+      await api('POST', `/api/cards/${this.get('card._id')}/bolt-in`, { signal: sig.signal });
       await this.refreshDetail();
     } catch (err) {
       this.set('actionError', err.message);
+    }
+  },
+
+  async boltInSend(thread) {
+    if (!(thread.input || '').trim()) return;
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/bolt-in`, { threadId: thread._id, text: thread.input });
+      await this.refreshDetail();
+      pollDetailSoon();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  async boltInClose(thread) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/bolt-in`, { threadId: thread._id, close: true });
+      await this.refreshDetail();
+      pollDetailSoon();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  boltInReopen(thread) {
+    const idx = (this.get('card.boltInThreads') || []).findIndex((t) => String(t._id) === String(thread._id));
+    if (idx >= 0) this.set(`card.boltInThreads.${idx}.status`, 'open');
+  },
+
+  // THE one send: reading was the review; this is the approval.
+  async sendCard() {
+    this.set({ notice: null, actionError: null });
+    const card = this.get('card');
+    const lineOverrides = {};
+    const unticked = [];
+    for (const c of card.claims || []) {
+      if (c.leftOut) unticked.push(c._id);
+      if (c.overridePick) lineOverrides[c._id] = c.overridePick;
+    }
+    try {
+      await api('POST', `/api/cards/${card._id}/send`, {
+        checkerId: this.get('checkerPick') || null,
+        lineOverrides,
+        unticked,
+      });
+      this.set('notice', 'Sent. Someone who saw the work checks it next. Set-aside lines stayed behind as drafts — no penalty.');
+      await this.refreshDetail();
+    } catch (err) {
+      const failures = err.failures?.map((f) => `${f.nominee}: ${f.reason}`).join(' · ');
+      this.set('actionError', failures || err.message);
     }
   },
 
@@ -231,11 +336,12 @@ const app = new Ractive({
     await this.claimAction(claim, { action: 'defend', statement: claim.defenseText });
   },
 
-  // A1: exposure sign-off — one line on how you know the pick saw the work.
+  // A1: exposure sign-off — one line on how you know the pick saw the
+  // work. Per pick (C2v2): a card can carry more than one.
   async confirmSignoff(row) {
     this.set({ error: null });
     try {
-      await api('POST', `/api/cards/${row._id}/signoff`, { action: 'confirm', note: row.confirmNote });
+      await api('POST', `/api/cards/${row._id}/signoff`, { action: 'confirm', note: row.confirmNote, reviewerId: row.reviewerId });
       await loadHome();
     } catch (err) {
       this.set('error', err.message);
@@ -245,7 +351,7 @@ const app = new Ractive({
   async refuseSignoff(row) {
     this.set({ error: null });
     try {
-      await api('POST', `/api/cards/${row._id}/signoff`, { action: 'refuse', reason: row.refuseReason });
+      await api('POST', `/api/cards/${row._id}/signoff`, { action: 'refuse', reason: row.refuseReason, reviewerId: row.reviewerId });
       await loadHome();
     } catch (err) {
       this.set('error', err.message);
@@ -288,39 +394,11 @@ const app = new Ractive({
     }
   },
 
-  async openNomination() {
-    this.set({ notice: null, actionError: null });
-    try {
-      if (this.get('card.status') === 'structured') {
-        await api('POST', `/api/cards/${this.get('card._id')}/approve`);
-        await this.refreshDetail();
-      }
-      const candidates = await api('GET', '/api/nominee-candidates');
-      this.set({ candidates, nominating: true, nomineePick: null });
-    } catch (err) {
-      this.set('actionError', err.message);
-    }
-  },
-
-  async submitNomination() {
-    this.set({ notice: null, actionError: null });
-    try {
-      await api('POST', `/api/cards/${this.get('card._id')}/nominate`, {
-        nomineeId: this.get('nomineePick'),
-      });
-      this.set({ nominating: false, notice: 'Your pick is in. Someone who knows the work gives it a quick check next.' });
-      await this.refreshDetail();
-    } catch (err) {
-      const failures = err.failures?.map((f) => `${f.nominee}: ${f.reason}`).join(' · ');
-      this.set('actionError', failures || err.message);
-    }
-  },
-
   async submitThinPool() {
     this.set({ notice: null, actionError: null });
     try {
-      await api('POST', `/api/cards/${this.get('card._id')}/nominate`, { thinPool: true });
-      this.set({ nominating: false, notice: 'Sent through the backup path — marked so everyone can see.' });
+      await api('POST', `/api/cards/${this.get('card._id')}/send`, { thinPool: true });
+      this.set({ notice: 'Sent through the backup path — marked so everyone can see.' });
       await this.refreshDetail();
     } catch (err) {
       this.set('actionError', err.message);
@@ -395,20 +473,56 @@ async function loadCapture(cardId) {
     const me = app.get('me');
     const track = home.track || { controlledVocabulary: {} };
     const isOwn = String(card.talentId) === String(me.id);
+    // C2v2 document screen: one read, one send; per-line threads.
+    const isDocScreen = isOwn && ['structured', 'talent-approved', 'exposure-signoff'].includes(card.status);
+    const isAdjustScreen = isOwn && card.status === 'adjust';
+    const THIN = 'insufficient detail — draft';
+    for (const c of card.claims || []) {
+      c.aside = !c.anchorText || (c.flags || []).includes(THIN);
+      c.leftOut = false;
+      c.overridePick = '';
+      c.threadOpen = false;
+      c.threadInput = '';
+      c.showContext = false;
+    }
+    const candidates = isDocScreen ? await api('GET', '/api/nominee-candidates').catch(() => []) : [];
+    const boltInsView = (track.boltIns || []).map((name) => ({
+      name,
+      claimed:
+        (card.claims || []).some((c) => c.competencyOrDomain === name) ||
+        (card.boltInThreads || []).some((t) => t.competency === name && ['open', 'structuring'].includes(t.status)),
+    }));
     app.set({
       view: 'detail',
       card,
       track,
-      isConfirmScreen: isOwn && !card.inCalibration && ['structured', 'adjust'].includes(card.status),
+      isDocScreen,
+      isAdjustScreen,
+      isConfirmScreen: isDocScreen || isAdjustScreen,
       isReviewScreen:
         ['routed', 'ruled', 'reassigned'].includes(card.status) &&
-        String(card.nomination?.routedTo) === String(me.id),
+        ((card.claims || []).some((c) => String(c.checkerId) === String(me.id)) ||
+          String(card.nomination?.routedTo) === String(me.id)),
       refuseText: '',
       vocabFields: Object.keys(track.controlledVocabulary || {}),
       approvedCount: (card.claims || []).filter((c) => c.talentApproved).length,
+      candidates,
+      checkerPick: String(card.nomination?.routes?.[0]?.reviewerId ?? ''),
+      boltInsView,
+      needsResend:
+        isDocScreen &&
+        card.status !== 'structured' &&
+        ((card.claims || []).some((c) => c.needsRelook || (c.talentApproved && !c.checkerId && !c.verdict)) ||
+          !(card.nomination?.routes || []).length),
       nominating: false,
       nomineePick: null,
     });
+    recountDoc();
+    // Something is still being written or re-checked — refresh shortly.
+    const pending =
+      (card.claims || []).some((c) => (c.contentions || []).some((x) => x.outcome === null)) ||
+      (card.boltInThreads || []).some((t) => t.status === 'structuring');
+    if (pending) pollDetailSoon();
     return;
   }
   const track = home.track || { questionSet: [], competencyOrDomainList: [] };
@@ -464,6 +578,74 @@ async function loadCapture(cardId) {
     saveState: 'idle',
   });
   refreshDerived();
+}
+
+// ---------------------------------------------------------------------------
+// C2v2 document screen helpers
+// ---------------------------------------------------------------------------
+
+/** Ready / set-aside / left-out counts + the "N lines to X" send summary. */
+function recountDoc() {
+  const card = app.get('card');
+  if (!card || !app.get('isDocScreen')) return;
+  const claims = card.claims || [];
+  const live = claims.filter((c) => !c.aside && !c.leftOut && !c.verdict);
+  app.set({
+    docReady: live.length,
+    docAside: claims.filter((c) => c.aside && !c.verdict).length,
+    docLeftOut: claims.filter((c) => c.leftOut).length,
+  });
+  const cands = app.get('candidates') || [];
+  const pickName = (id) => (cands.find((c) => String(c._id) === String(id)) || {}).name || '';
+  const pick = app.get('checkerPick');
+  app.set('checkerPickName', pickName(pick));
+  const groups = {};
+  for (const c of live) {
+    const to = c.overridePick || pick;
+    if (!to) continue;
+    const nm = pickName(to) || 'your pick';
+    groups[nm] = (groups[nm] || 0) + 1;
+  }
+  const parts = Object.entries(groups).map(([nm, n]) => `${n} line${n === 1 ? '' : 's'} to ${nm}`);
+  app.set('sendSummary', parts.length ? `${parts.join(' · ')}.` : `${live.length} line(s) ready.`);
+}
+
+app.observe(
+  'checkerPick card.claims.*.overridePick card.claims.*.leftOut',
+  () => {
+    if (app.get('view') === 'detail') recountDoc();
+  },
+  { init: false },
+);
+
+/** One quiet refresh while a line is being re-checked or written up. */
+let pollTimer = null;
+function pollDetailSoon(ms = 20000) {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(() => {
+    if (app.get('view') === 'detail') app.refreshDetail().catch(() => {});
+  }, ms);
+}
+
+/** The quote, shown inside the conversation it came from. */
+function contextTurnsFor(card, claim) {
+  const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const q = norm(claim.sourceQuote);
+  const convo = card.conversation || [];
+  const idx = convo.findIndex((t) => t.role === 'talent' && norm(t.text).includes(q));
+  if (idx >= 0) {
+    return convo
+      .slice(Math.max(0, idx - 1), idx + 2)
+      .map((t) => ({ role: t.role, text: t.text, hit: t === convo[idx] }));
+  }
+  const ra = (card.rawAnswers || []).find((a) => norm(a.answer).includes(q));
+  if (ra) {
+    return [
+      { role: 'ai', text: ra.question, hit: false },
+      { role: 'talent', text: ra.answer, hit: true },
+    ];
+  }
+  return [{ role: 'talent', text: claim.sourceQuote, hit: true }];
 }
 
 // ---------------------------------------------------------------------------

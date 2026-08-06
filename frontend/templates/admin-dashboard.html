@@ -140,13 +140,18 @@
       <div class="section-label">Calibration — the exit gate</div>
       <div class="record-meta" style="margin-bottom: 0.75rem;">
         {{#each calibrationStreaks}}
-          <span class="tag">{{.label}}: {{.cleanStreak}} clean in a row · {{.distinctTalents}} talent(s) — gate is 5 across 3{{#if !.calibrationMode}} · OFF{{/if}}</span>
+          <span class="tag">{{.label}}: {{.cleanStreak}} reached a checker clean, in a row · {{.distinctTalents}} talent(s) — gate is 5 across 3{{#if !.calibrationMode}} · OFF{{/if}}</span>
         {{/each}}
       </div>
     </section>
 
     <section>
-      <div class="section-label">Calibration queue <span class="count">{{calibration.length}}</span></div>
+      <div class="section-label">Spot check — released write-ups <span class="count">{{calibration.length}}</span></div>
+      <p class="muted" style="font-size: var(--text-sm); margin-bottom: 0.75rem;">
+        Cards no longer wait for you — the talent already has these. Fix what the AI got wrong, on your own time.
+        Before the talent sends: your fix lands silently. After they send: your fix pulls the line back for their re-look.
+        Once it reaches a checker: fixes go in the log only.
+      </p>
       {{#if calibration.length}}
         {{#each calibration}}
           <article class="record">
@@ -158,6 +163,11 @@
               <span>{{.track}}</span>
               <span>pack {{.packVersion}}</span>
               <span>{{.claims.length}} claims</span>
+              {{#if .status === 'structured'}}
+                <span class="tag">with the talent — fixes land silently</span>
+              {{else}}
+                <span class="tag" style="color: var(--amber-ink);">sent — a fix pulls that line back for their re-look</span>
+              {{/if}}
             </div>
 
             {{#if .captureMode === 'conversation' && .conversation.length}}
@@ -207,15 +217,13 @@
             {{/each}}
 
             <div class="record-foot">
-              <span class="muted" style="font-size: var(--text-xs);">Fixes are checked against the pack and logged.</span>
-              <span class="spacer"></span>
-              <button class="btn btn-primary" on-click="@this.releaseCard(this)">Release to talent</button>
+              <span class="muted" style="font-size: var(--text-xs);">Fixes are checked against the pack and logged. Nothing here blocks the talent.</span>
             </div>
           </article>
         {{/each}}
       {{else}}
         <div class="empty-state">
-          Nothing waiting. While calibration is on, new cards stop here first. Five clean cards in a row, across three talents, ends calibration.
+          Nothing to spot-check. New write-ups land here the moment they're drafted — and go to the talent at the same time.
         </div>
       {{/if}}
     </section>

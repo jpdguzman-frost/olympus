@@ -3,8 +3,8 @@
 /* JP's rule: words so simple a J1 gets them without thinking. */
 const STATUS_LABELS = {
   draft: 'Draft',
-  structured: 'Ready to check',
-  'talent-approved': 'Approved by you',
+  structured: 'Read it — your write-up is ready',
+  'talent-approved': 'Sent by you',
   'exposure-signoff': 'Checking your pick',
   routed: 'With your reviewer',
   confirmed: 'Confirmed',

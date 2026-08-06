@@ -63,9 +63,12 @@ export async function createDraft(actor, { subjectName = '', closeDate = null, c
 // ---------------------------------------------------------------------------
 
 /**
- * FR-11: while a card holds in calibration, its claims queue to Admin
- * BEFORE the talent sees them. Everyone but admin gets the card with
- * claims/follow-ups stripped and an inCalibration marker.
+ * Visibility (C2v2): the talent and admin see everything. A checker
+ * sees only approved/verdicted lines, and only THEIR lines — one
+ * non-advocate per line, you judge what you saw. Other readers (a lead
+ * on a confirmed card) see the approved/verdicted set.
+ * The FR-11 calibration hold is retired (JP, Aug 6): structured cards
+ * go straight to the talent; JP spot-checks released cards instead.
  */
 const STALE_MS = 60 * 24 * 60 * 60 * 1000;
 
@@ -79,6 +82,16 @@ export function presentCard(actor, card) {
   const isOwn = obj.talentId?.toString?.() === actor._id?.toString?.();
   if (!isOwn && !actor.hasRole('admin') && Array.isArray(obj.claims)) {
     obj.claims = obj.claims.filter((c) => c.talentApproved || c.verdict);
+    const actorId = actor._id?.toString?.();
+    const isChecker =
+      (obj.nomination?.routes || []).some((r) => r.reviewerId?.toString?.() === actorId) ||
+      obj.nomination?.routedTo?.toString?.() === actorId;
+    if (isChecker) {
+      // C2v2: one non-advocate per line — a checker reads and judges
+      // only the lines the talent sent to THEM (legacy cards with no
+      // per-line checker fall back to the whole approved set).
+      obj.claims = obj.claims.filter((c) => (c.checkerId ? c.checkerId.toString() === actorId : true));
+    }
   }
   // BR-4: filed 60+ days after close carries STALE — context, never a block.
   if (obj.filedDate && obj.closeDate && new Date(obj.filedDate) - new Date(obj.closeDate) > STALE_MS) {
@@ -87,9 +100,6 @@ export function presentCard(actor, card) {
   // A4: the one pre-expiry nudge surfaces on home — plain, no blame.
   if (obj.status === 'draft' && !obj.submittedForStructuringAt && Date.now() - new Date(obj.updatedAt) > NUDGE_IDLE_MS) {
     obj.archivesSoon = true;
-  }
-  if (obj.calibrationHold && !actor.hasRole('admin')) {
-    return { ...obj, claims: [], followUps: [], signalsNoted: [], inCalibration: true };
   }
   return obj;
 }
@@ -103,7 +113,9 @@ export async function getCardForRead(actor, cardId) {
   if (!card) throw notFound('Card not found');
 
   const isOwn = card.talentId.equals(actor._id);
-  const isRoutedToActor = card.nomination?.routedTo?.equals?.(actor._id) ?? false;
+  const isRoutedToActor =
+    (card.nomination?.routedTo?.equals?.(actor._id) ?? false) ||
+    (card.nomination?.routes || []).some((r) => r.reviewerId?.equals?.(actor._id));
   const isAdmin = actor.hasRole('admin');
 
   let isLeadOfTalent = false;
@@ -134,7 +146,10 @@ export async function listTeamConfirmed(actor) {
 }
 
 export async function listQueue(actor) {
-  return Card.find({ 'nomination.routedTo': actor._id, status: 'routed' }).sort({ updatedAt: -1 });
+  return Card.find({
+    status: 'routed',
+    $or: [{ 'nomination.routedTo': actor._id }, { 'nomination.routes.reviewerId': actor._id }],
+  }).sort({ updatedAt: -1 });
 }
 
 /**
@@ -294,9 +309,14 @@ export async function applyVerdict(actor, cardId, claimId, { verdict, note = nul
   const card = await Card.findById(cardId);
   if (!card) throw notFound('Card not found');
 
-  const routedTo = card.nomination?.routedTo;
-  if (!routedTo || !routedTo.equals(actor._id)) {
-    throw forbidden('Only the card\'s assigned reviewer can write a verdict');
+  const claim = card.claims.id(claimId);
+  if (!claim) throw notFound('Claim not found');
+  // C2v2: one non-advocate per LINE — the verdict guard is the line's
+  // assigned checker (legacy cards fall back to the card-level route).
+  // Admin, lead, JP, and every other checker are rejected identically.
+  const assigned = claim.checkerId ?? card.nomination?.routedTo;
+  if (!assigned || !assigned.equals(actor._id)) {
+    throw forbidden('Only this line\'s assigned checker can write a verdict');
   }
   if (!REVIEWABLE_STATUSES.includes(card.status)) {
     throw conflict(`Card is not reviewable in status "${card.status}"`);
@@ -309,8 +329,6 @@ export async function applyVerdict(actor, cardId, claimId, { verdict, note = nul
     throw badRequest('Confirmed requires a one-line attestation: what did you check?');
   }
 
-  const claim = card.claims.id(claimId);
-  if (!claim) throw notFound('Claim not found');
   if (!claim.talentApproved && !claim.verdict) {
     throw conflict('This line was never approved by the talent — it stays a draft and takes no verdict (Invariant 5)');
   }

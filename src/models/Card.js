@@ -29,7 +29,33 @@ const claimSchema = new Schema(
     // list (C6 two layers; packs version faster than code) — no mongoose
     // enum, or a new pack's flags would be rejected at save time.
     flags: [{ type: String }],
+    // C2v2 document screen (JP, Aug 6): every line explains itself.
+    // rationale = why the line reads the way it does, in plain words
+    // (AI-authored — it is an explanation, never a quote). missingPiece
+    // = exactly what an evidence-gated line still needs (only set when
+    // the line carries the thin flag).
+    rationale: { type: String, default: null },
+    missingPiece: { type: String, default: null },
+    // C2v2: one non-advocate per line. Set at send time; every routed
+    // line carries exactly one checker. null = not sent (draft line).
+    checkerId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    // C2v2: the per-line talk-it-out thread (clarify the rationale, back
+    // up an evidence-gated line). Talent turns ALSO persist verbatim
+    // into card.rawAnswers before any AI call (Invariant 15); closing a
+    // thread opens a contention, and the existing re-map loop answers it.
+    thread: [
+      {
+        role: { type: String, enum: ['ai', 'talent'], required: true },
+        text: { type: String, required: true },
+        at: { type: Date, default: Date.now },
+      },
+    ],
     talentApproved: { type: Boolean, default: false },
+    // Spot-check fix window (JP, Aug 6): JP tightened this line AFTER the
+    // talent approved it (send → before it reached the checker). The line
+    // is pulled back — the talent re-looks and re-sends, or leaves it. A
+    // checker never judges text the talent didn't approve.
+    needsRelook: { type: Boolean, default: false },
     verdict: { type: String, enum: ['Confirmed', 'Adjust', null], default: null },
     // Adjust: the reviewer's required note. Confirmed: the required A5
     // attestation — one line stating what the non-advocate checked.
@@ -107,7 +133,40 @@ const nominationSchema = new Schema(
       by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
       at: { type: Date, default: null },
     },
-    routedTo: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    routedTo: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // legacy single-route cards (pre-C2v2)
+    // C2v2 (JP, Aug 6 — supersedes C2): a card fans out to one route per
+    // distinct checker; each LINE has exactly one non-advocate
+    // (claims[].checkerId), and each route carries its own exposure
+    // check, SLA clock, chases, and escalation.
+    routes: [
+      {
+        reviewerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        name: { type: String, default: '' },
+        // plain-language: how this pick cleared ('auto-verified — …',
+        // 'signed off', 'backup path') or 'awaiting sign-off'.
+        exposure: { type: String, default: null },
+        signoff: {
+          decision: { type: String, enum: ['confirm', 'refuse', null], default: null },
+          note: { type: String, default: null },
+          reason: { type: String, default: null },
+          by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+          at: { type: Date, default: null },
+        },
+        routedAt: { type: Date, default: null }, // A5: this route's SLA clock
+        chases: [
+          {
+            at: { type: Date, default: Date.now },
+            kind: { type: String, enum: ['auto-chase', 'manual-nudge'] },
+            by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+          },
+        ],
+        reassignedFrom: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+        reassignedAt: { type: Date, default: null },
+        escalated: { type: String, enum: ['refused-after-ruling', 'sla', null], default: null },
+        escalationHalted: { type: Schema.Types.Mixed, default: null }, // { reason, at }
+        repeatStreak: { type: Number, default: 0 },
+      },
+    ],
     repeatStreak: { type: Number, default: 0 },
     thinPool: { type: Boolean, default: false }, // FR-15: exception path, visibly marked
     // A5 SLA: the clock starts at routing and restarts on re-route or
@@ -188,6 +247,28 @@ const cardSchema = new Schema(
         at: { type: Date, default: Date.now },
       },
     ],
+    // C2v2: bolt-in / signal-claim threads — the talent taps a bolt-in
+    // from the full list (or an unclaimed signal) and a small contextual
+    // chat gathers enough for the structurer to draft a line. Talent
+    // turns persist verbatim into rawAnswers first (Invariant 15); the
+    // structuring happens in the worker, never in the request path.
+    boltInThreads: [
+      {
+        competency: { type: String, default: null }, // null on a signal thread until the structurer maps it
+        fromSignal: { type: String, default: null }, // the signal text, when opened from "we also noticed"
+        thread: [
+          {
+            role: { type: String, enum: ['ai', 'talent'], required: true },
+            text: { type: String, required: true },
+            at: { type: Date, default: Date.now },
+          },
+        ],
+        status: { type: String, enum: ['open', 'structuring', 'done', 'nothing'], default: 'open' },
+        response: { type: String, default: null }, // plain-language outcome shown to the talent
+        attempts: { type: Number, default: 0 },
+        at: { type: Date, default: Date.now },
+      },
+    ],
     productionRecord: [{ type: Schema.Types.Mixed }],
     honestGap: { type: String, default: null }, // talent's own words only (FR-19)
     nomination: { type: nominationSchema, default: () => ({}) },
@@ -235,5 +316,6 @@ const cardSchema = new Schema(
 
 cardSchema.index({ talentId: 1, status: 1 });
 cardSchema.index({ 'nomination.routedTo': 1, status: 1 });
+cardSchema.index({ 'nomination.routes.reviewerId': 1, status: 1 });
 
 export const Card = mongoose.model('Card', cardSchema);

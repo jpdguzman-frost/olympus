@@ -117,8 +117,10 @@ describe('exposure auto-verify (A1 via A2)', () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('routed');
-    expect(res.body.data.nomination.systemChecks.exposure).toMatch(/auto-verified.*3 different weeks/);
-    expect(res.body.data.nomination.routedTo).toBe(ctx.users.reviewer._id.toString());
+    // C2v2: exposure detail lives on the route; every line carries the checker.
+    expect(res.body.data.nomination.routes[0].exposure).toMatch(/auto-verified.*3 different weeks/);
+    expect(res.body.data.nomination.routes[0].reviewerId).toBe(ctx.users.reviewer._id.toString());
+    expect(res.body.data.claims.every((c) => c.checkerId === ctx.users.reviewer._id.toString())).toBe(true);
   });
 
   it('below threshold the pick takes the human sign-off path', async () => {

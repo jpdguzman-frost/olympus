@@ -66,8 +66,11 @@ export async function cachedSummary(talentUser, projectName, { client = getClien
     'representative tasks, and state the time span.',
     'HARD RULES: never a number of tasks, never a total, never any volume statement ("many", "47", "high output").',
     'Never a judgment, level, score, or praise. No links. Neutral, simple English; short.',
-    'Format: one opening line, then one short line per kind of work, e.g.',
-    '"Board upkeep — cards like X and Y, January to June."',
+    'FORMAT — built to scan, never a wall of text (JP, Aug 6):',
+    '- One opening line, under 12 words.',
+    '- Then 3 to 6 lines, each starting with "• ", each under 14 words:',
+    '  "• Board upkeep — cards like X and Y · Jan–Jun 2026"',
+    '- Nothing else. No paragraph anywhere.',
   ].join('\n');
 
   const response = await client.messages.create({

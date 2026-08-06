@@ -6,16 +6,16 @@
  * and retried with backoff; killing the process mid-structuring loses
  * nothing because claims + status move in one save after success.
  *
- * FR-11: when the track's calibration mode is on, freshly structured
- * cards hold for admin review (calibrationHold) before the talent sees
- * the claims. Mode exit is a JP-owned gate (Invariant 14) — nothing here
- * flips it.
+ * Spot-check (JP, Aug 6 — the FR-11 HOLD is retired): freshly structured
+ * cards go straight to the talent. JP reviews released cards from the
+ * spot-check queue instead; his fix window runs until the card reaches
+ * a checker. Calibration-mode exit stays JP-owned (Invariant 14).
  */
 
 import { Card } from '../models/Card.js';
 import { Track } from '../models/Track.js';
 import { User } from '../models/User.js';
-import { structureCard, remapClaim, trackReadyForStructuring, StructuringError } from '../services/structurerService.js';
+import { structureCard, remapClaim, draftBoltInLine, trackReadyForStructuring, StructuringError } from '../services/structurerService.js';
 import { taskScaffold } from '../services/capsService.js';
 import { transition } from '../services/statusMachine.js';
 import { pushCardAudit, recordAudit } from '../services/auditService.js';
@@ -54,8 +54,69 @@ export async function runStructuringPass({ client } = {}) {
     }
 
     await runContentionPass({ client });
+    await runBoltInPass({ client });
   } finally {
     running = false;
+  }
+}
+
+/**
+ * C2v2: closed bolt-in / signal threads get their line drafted here —
+ * never in the request path. Same wall as everything else: controlled
+ * vocabulary only, verbatim quotes, thin words become a flagged draft.
+ */
+export async function runBoltInPass({ client } = {}) {
+  const cards = await Card.find({
+    status: 'structured',
+    'boltInThreads.status': 'structuring',
+  }).limit(5);
+
+  for (const card of cards) {
+    const track = await Track.findOne({ key: card.track });
+    if (!track || !trackReadyForStructuring(track)) continue;
+
+    for (const thread of card.boltInThreads) {
+      if (thread.status !== 'structuring') continue;
+      if (thread.attempts >= 3) {
+        thread.status = 'nothing';
+        thread.response =
+          'This could not be written up (a system problem, not you). Open it again to retry, or ask JP.';
+        pushCardAudit(card, { by: null, action: 'bolt-in-draft-failed', note: `gave up after ${thread.attempts} attempts` });
+        continue;
+      }
+      try {
+        const words = thread.thread.filter((t) => t.role === 'talent').map((t) => t.text);
+        const opts = client ? { client } : {};
+        const { claims, explanation } = await draftBoltInLine(
+          track,
+          card,
+          { competency: thread.competency, signal: thread.fromSignal, threadWords: words },
+          opts,
+        );
+        if (claims.length) {
+          card.claims.push(...claims);
+          thread.status = 'done';
+          thread.competency = thread.competency ?? claims[0].competencyOrDomain;
+          thread.response = explanation || 'Added to your card — check the new line.';
+          // A claimed signal stops being "noted, not claimed".
+          if (thread.fromSignal) {
+            card.signalsNoted = card.signalsNoted.filter((s) => s.signal !== thread.fromSignal);
+          }
+        } else {
+          thread.status = 'nothing';
+          thread.response = explanation || 'Not enough here to make a line yet. Open it again and add more, any time.';
+        }
+        pushCardAudit(card, {
+          by: null,
+          action: 'bolt-in-drafted',
+          after: { competency: thread.competency, lines: claims.length },
+        });
+      } catch (err) {
+        thread.attempts += 1; // retried next pass; capped above
+        console.error('[structurer] bolt-in draft failed', err.message);
+      }
+    }
+    await card.save();
   }
 }
 
@@ -150,7 +211,7 @@ export async function structureOne(card, { client } = {}) {
     card.behaviorSpecVersion = track.behaviorSpecVersion ?? null; // A7: and the behavior spec, in split mode
     card.structuringError = null;
     card.nextStructuringAttemptAt = null;
-    card.calibrationHold = Boolean(track.calibrationMode); // FR-11
+    card.calibrationHold = false; // the hold is retired — JP spot-checks released cards instead
     pushCardAudit(card, {
       by: card.talentId,
       action: 'structured',

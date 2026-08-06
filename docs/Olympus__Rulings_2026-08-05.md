@@ -79,3 +79,94 @@ be assigned to a card where they are the talent, the nominee, or a
 party to the deadlock. The SLA worker reads the current assignment at
 escalation time. Initial assignments are set in the admin UI at
 pilot, not in code.
+
+---
+
+# Addendum — Ratified Rulings of Aug 6, 2026
+
+Transcribed from JP's walkthrough feedback + design session of
+Aug 6, 2026 (in-session, including four AskUserQuestion decisions).
+Status: RATIFIED. These govern on conflict with anything above.
+
+## C2v2 — Per-line checkers (SUPERSEDES C2)
+
+JP, verbatim intent: "you can send it to different people and not
+only to 1 person… But one non-advocate per competency line."
+
+- A card's lines may go to DIFFERENT checkers. Exactly ONE
+  non-advocate per competency line — no line is ever judged by two.
+- Picking UX (ratified): one pick covers every line; any single line
+  can be switched to a different person who saw that work. Most cards
+  never touch the override.
+- Mechanics: the card fans out into one route per distinct checker.
+  Each route carries its own exposure check (CAPS auto-verify, else a
+  per-pick sign-off by the track verifier), its own SLA clock and
+  chases, and its own escalation/fallback path. The card routes when
+  every pick has cleared; it confirms when every sent line is decided.
+- The verdict guard moves to the LINE: only that line's assigned
+  checker can write its verdict (Invariant 3, per line). A checker
+  sees only the lines sent to them.
+- C3 refusal is per pick: a refused pick returns to the talent with
+  the reason; cleared picks are never re-checked on re-send.
+
+## DS-1 — The document screen (one read, one send)
+
+Ratified via option "One read, one tap":
+
+- After structuring, the talent gets ONE document-like screen: every
+  line with its labels, its verbatim quote shown IN the conversation
+  it came from, and a plain one-sentence rationale ("how we read it").
+- Reading is the review; the single send is the act of approval.
+  Every sent line still gets its per-line approval record at send
+  (Invariant 5 partial approval intact). Undo works on any line until
+  send. There is no per-line approve tap and no separate approve-card
+  step.
+- Per-line talk-it-out threads: the talent clarifies a line, argues
+  with its rationale, or adds the missing piece in their own words;
+  the words persist verbatim (Invariant 15) and the line re-checks
+  through the existing contention/re-map loop. Never final over
+  their objection.
+- Evidence gate, shown plainly: a line that is thin or undated is
+  "not backed yet — stays out until you back it", with exactly what
+  is missing named on the line. Such lines physically cannot ride a
+  send; they stay behind as costless drafts. (The pack flag string
+  stays verbatim underneath — Invariant 1.)
+- Checker visibility pre-send (ratified: "Name only"): the checker's
+  name is pinned on the screen while the talent works; the checker
+  sees NOTHING until send.
+- Dispute controls (defend/contest) appear only after a checker says
+  Adjust.
+
+## DS-2 — Bolt-ins and signals on the document screen
+
+Ratified via option "Full list, always": the pack's Part 3 bolt-ins
+render as a full, always-visible list — "they can't claim what they
+can't see" — claimed ones marked. Tapping one opens a small
+contextual thread; the words persist verbatim; the structurer drafts
+the line through the same FR-10 wall. Signals ("we also noticed")
+are offered the same way, no pressure. A claimed signal stops being
+"noted, not claimed".
+
+## SC-1 — Spot-check replaces the calibration hold (FR-11 amended)
+
+Ratified via option "Spot-check only": structured cards go straight
+to the talent; nothing waits in a queue. JP reviews released cards
+on his own time with the same correction tools.
+
+THE FIX WINDOW (ratified "Yes — lock it"):
+- Before the talent sends: JP's fix lands silently.
+- After send, before the card reaches a checker: a fix PULLS THE
+  LINE BACK — approval clears, the checker slot empties, the talent
+  re-looks and re-sends. A checker never judges text the talent
+  didn't approve.
+- Once routed: log-only. The correction records as calibration input
+  (Pack §E feed) and touches nothing on the card.
+- The GATE-1 streak now counts cards that REACHED A CHECKER with
+  zero corrections (5 across 3 talents unchanged; exit stays JP's,
+  Invariant 14).
+
+## SUM-1 — CAPS summary shape
+
+Ratified ("hard to scan"): the activity summary renders as one short
+opening line + 3–6 scannable bullet lines. Never a wall of text; all
+A2 bans unchanged (no counts, no volume, no judgment, no links).

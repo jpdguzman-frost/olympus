@@ -78,6 +78,7 @@ try {
   track.competencyOrDomainList = vocab.competencyOrDomainList;
   track.controlledVocabulary = vocab.controlledVocabulary ?? {};
   track.claimFlags = Array.isArray(vocab.claimFlags) ? vocab.claimFlags : [];
+  track.boltIns = Array.isArray(vocab.parts?.part3BoltIns) ? vocab.parts.part3BoltIns : [];
   await track.save();
 
   await recordAudit({

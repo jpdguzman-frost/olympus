@@ -95,7 +95,7 @@ function claimItemSchema(track) {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['type', 'competencyOrDomain', 'labels', 'sourceQuote', 'flags', 'anchor'],
+    required: ['type', 'competencyOrDomain', 'labels', 'sourceQuote', 'flags', 'anchor', 'rationale', 'missingPiece'],
     properties: {
       type: { type: 'string' },
       competencyOrDomain: { type: 'string', enum: track.competencyOrDomainList },
@@ -117,6 +117,14 @@ function claimItemSchema(track) {
       // A4 date anchoring: account + date/period IN THE TALENT'S WORDS,
       // empty string when they never said one. Never invented.
       anchor: { type: 'string' },
+      // C2v2 document screen: why the line reads the way it does — ONE
+      // plain sentence pointing at their words. An explanation, never a
+      // quote, never a level or a judgment.
+      rationale: { type: 'string' },
+      // Exactly what an evidence-gated line still needs, in plain words
+      // ("a when — roughly when did this happen?"). Empty string unless
+      // the line carries the "insufficient detail — draft" flag.
+      missingPiece: { type: 'string' },
     },
   };
 }
@@ -229,6 +237,12 @@ function renderCardInput(card, capsScaffold = null, { minimal = false } = {}) {
     '- Draft EVERY claim their words support, each at the lowest plausible reading, controlled vocabulary only.',
     '- Every claim carries its traceback: sourceQuote must be an EXACT verbatim substring of their answers.',
     '- anchor: the account + date/period IN THEIR WORDS (empty string if they never said one).',
+    '- rationale: ONE plain sentence saying why the line reads the way it does, pointing at their words',
+    '  ("You said no one checks this work, so it reads as fully owned."). Simple words, no jargon,',
+    '  never a level, never praise. The talent reads this to judge whether you got their intent right.',
+    '- missingPiece: when (and only when) you flag a line "insufficient detail — draft", say exactly',
+    '  what one piece is missing, plainly ("a when — roughly when did this happen?", "where this was").',
+    '  Empty string on every other line.',
     '- Note upward signals they did not claim (signalsNoted), each with its exact verbatim quote.',
     '- followUps: the anchor/clarifier questions you would ask, within your question budget — they will be relayed to the talent.',
     'Output only the schema. Never a level, never a score.',
@@ -365,6 +379,15 @@ export function validateStructuredOutput(track, card, output) {
     // the talent's words; an empty anchor leaves the line "needs a date".
     const anchorText = typeof raw.anchor === 'string' && raw.anchor.trim() ? raw.anchor.trim() : null;
 
+    // C2v2: missingPiece only survives on an evidence-gated line — and an
+    // unanchored line always gates, so the screen can say what's missing.
+    const thin = flags.includes('insufficient detail — draft');
+    const missingPiece = thin || !anchorText
+      ? (typeof raw.missingPiece === 'string' && raw.missingPiece.trim())
+        ? raw.missingPiece.trim()
+        : 'a when — roughly when this was, and where'
+      : null;
+
     claims.push({
       type: raw.type || 'claim',
       competencyOrDomain: raw.competencyOrDomain,
@@ -375,6 +398,8 @@ export function validateStructuredOutput(track, card, output) {
       flags,
       anchorText,
       anchorSource: anchorText ? 'structurer' : null,
+      rationale: typeof raw.rationale === 'string' && raw.rationale.trim() ? raw.rationale.trim() : null,
+      missingPiece,
       talentApproved: false,
       verdict: null,
     });
@@ -403,6 +428,80 @@ export function validateStructuredOutput(track, card, output) {
     .map((question) => ({ question, answer: null }));
 
   return { claims, followUps, signalsNoted, rejected };
+}
+
+// ---------------------------------------------------------------------------
+// C2v2 — draft a line from a bolt-in / signal thread
+// ---------------------------------------------------------------------------
+
+/**
+ * The talent talked about one bolt-in (or an unclaimed signal) in a
+ * contextual thread; their words are already in rawAnswers (Invariant
+ * 15). Draft the line(s) those words support — same wall as everything
+ * else: controlled vocabulary only, verbatim quotes, ambiguity defaults
+ * down, thin words become a flagged draft, never a stub.
+ * Returns { claims, rejected, explanation }.
+ */
+export async function draftBoltInLine(track, card, { competency = null, signal = null, threadWords = [] }, { client = getClient() } = {}) {
+  if (!trackReadyForStructuring(track)) {
+    throw new StructuringError('awaiting-pack', `Track "${track.key}" is not ready`);
+  }
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['claims', 'explanation'],
+    properties: {
+      claims: { type: 'array', items: claimItemSchema(track) },
+      explanation: { type: 'string' },
+    },
+  };
+
+  const userContent = [
+    renderCardInput(card),
+    '',
+    signal
+      ? `THE TALENT IS NOW CLAIMING something first noted as a signal: "${signal}"`
+      : `THE TALENT OPENED AN ADD-ON TOPIC${competency ? `: "${competency}"` : ''}`,
+    'They said, in a short follow-up thread (verbatim, already part of the raw answers above):',
+    ...threadWords.map((w) => `- ${w}`),
+    '',
+    competency
+      ? `Draft the claim line(s) these words support — expected under "${competency}", but map honestly: if the words support a different competency from the list, use that one.`
+      : 'Draft the claim line(s) these words support, mapped to the right competency from the list.',
+    'All your rules apply: lowest plausible reading, verbatim quotes only, flag thin words',
+    '("insufficient detail — draft" + missingPiece) rather than going empty. If the words truly map',
+    'to nothing claimable, return claims: [] and say why in explanation — plain, simple words,',
+    'no blame; that answer goes to the talent.',
+  ].join('\n');
+
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 8000,
+    system: [{ type: 'text', text: composeSystemPrompt(track), cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: userContent }],
+    output_config: { format: { type: 'json_schema', schema } },
+  });
+
+  if (response.stop_reason === 'refusal') {
+    throw new StructuringError('refusal', 'The model declined to process this thread');
+  }
+  const textBlock = response.content.find((b) => b.type === 'text');
+  if (!textBlock) throw new StructuringError('empty-response', 'No draft returned');
+
+  let parsed;
+  try {
+    parsed = JSON.parse(textBlock.text);
+  } catch (err) {
+    throw new StructuringError('parse-failure', `Draft output was not valid JSON: ${err.message}`);
+  }
+
+  const { claims, rejected } = validateStructuredOutput(track, card, {
+    claims: Array.isArray(parsed.claims) ? parsed.claims : [],
+    followUps: [],
+    signalsNoted: [],
+  });
+  return { claims, rejected, explanation: parsed.explanation || '' };
 }
 
 // ---------------------------------------------------------------------------

@@ -78,7 +78,7 @@ const app = new Ractive({
   async nudgeCard(row) {
     this.set({ error: null, notice: null });
     try {
-      await api('POST', `/api/admin/cards/${row._id}/nudge`);
+      await api('POST', `/api/admin/cards/${row._id}/nudge`, { reviewerId: row.reviewerId || null });
       this.set('notice', `Nudged ${row.reviewerName}.`);
       await refresh();
     } catch (err) {
@@ -128,11 +128,18 @@ const app = new Ractive({
         this.set('error', 'Write the fix as field: value (comma for more than one)');
         return;
       }
-      await api('POST', `/api/admin/calibration/${card._id}/claims/${claim._id}`, {
+      const result = await api('POST', `/api/admin/calibration/${card._id}/claims/${claim._id}`, {
         action: 'edit',
         labels: { ...claim.labels, ...labels },
       });
-      this.set('notice', 'Fix saved and logged.');
+      this.set(
+        'notice',
+        result.logOnly
+          ? 'Fix window closed — logged as calibration input only; the card is unchanged.'
+          : result.pulledBack
+            ? 'Fix saved. The line goes back to the talent for a re-look before any checker sees it.'
+            : 'Fix saved and logged.',
+      );
       await refresh();
     } catch (err) {
       this.set('error', err.message);
@@ -142,19 +149,13 @@ const app = new Ractive({
   async removeClaim(card, claim) {
     this.set({ error: null, notice: null });
     try {
-      await api('POST', `/api/admin/calibration/${card._id}/claims/${claim._id}`, { action: 'remove' });
-      this.set('notice', 'Line removed and logged.');
-      await refresh();
-    } catch (err) {
-      this.set('error', err.message);
-    }
-  },
-
-  async releaseCard(card) {
-    this.set({ error: null, notice: null });
-    try {
-      await api('POST', `/api/admin/calibration/${card._id}/release`);
-      this.set('notice', `Released “${card.subject.name}” — the talent can now see their lines.`);
+      const result = await api('POST', `/api/admin/calibration/${card._id}/claims/${claim._id}`, { action: 'remove' });
+      this.set(
+        'notice',
+        result.logOnly
+          ? 'Fix window closed — logged as calibration input only; the card is unchanged.'
+          : 'Line removed and logged.',
+      );
       await refresh();
     } catch (err) {
       this.set('error', err.message);

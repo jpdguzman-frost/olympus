@@ -31,6 +31,7 @@ router.get('/api/home', async (req, res, next) => {
         questionSet: track.questionSet,
         competencyOrDomainList: track.competencyOrDomainList,
         controlledVocabulary: track.controlledVocabulary,
+        boltIns: track.boltIns, // C2v2: the full add-on list, always shown
         vocabPackVersion: track.vocabPackVersion,
       },
     });
@@ -162,6 +163,40 @@ router.post('/api/cards/:id/follow-ups/:followUpId/answer', async (req, res, nex
 router.post('/api/cards/:id/approve', async (req, res, next) => {
   try {
     sendSuccess(res, await confirm.approveCard(req.currentUser, req.params.id, req.body ?? {}));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- C2v2: THE one send — reading is the review, this is the approval.
+// One pick covers every line; any line can switch to a different
+// checker; set-aside and unticked lines stay behind as costless drafts.
+router.post('/api/cards/:id/send', async (req, res, next) => {
+  try {
+    sendSuccess(res, await confirm.sendPicks(req.currentUser, req.params.id, req.body ?? {}));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- C2v2: per-line talk-it-out thread (clarify / argue / back it up) ---
+router.post('/api/cards/:id/claims/:claimId/thread', async (req, res, next) => {
+  try {
+    const { lineThread } = await import('../services/conversationService.js');
+    const { card, claim, turn } = await lineThread(req.currentUser, req.params.id, req.params.claimId, req.body ?? {});
+    sendSuccess(res, { turn, thread: claim.thread, card: cards.presentCard(req.currentUser, card) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- C2v2: bolt-in / signal threads — the full list is shown; a small
+// contextual chat gathers enough, the worker drafts the line.
+router.post('/api/cards/:id/bolt-in', async (req, res, next) => {
+  try {
+    const { boltInThread } = await import('../services/conversationService.js');
+    const { card, thread, turn } = await boltInThread(req.currentUser, req.params.id, req.body ?? {});
+    sendSuccess(res, { turn, thread, card: cards.presentCard(req.currentUser, card) });
   } catch (err) {
     next(err);
   }

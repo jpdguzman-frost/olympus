@@ -30,6 +30,10 @@ const trackSchema = new mongoose.Schema(
       validate: [(qs) => qs.length === 4, 'questionSet must contain exactly 4 questions'],
     },
     competencyOrDomainList: [{ type: String }],
+    // C2v2 (JP, Aug 6): the pack's Part 3 bolt-ins, shown to the talent
+    // as a full list — "they can't claim what they can't see". From the
+    // pack sidecar (parts.part3BoltIns); never invented here.
+    boltIns: [{ type: String }],
     // Machine-readable controlled vocabulary from the pack: {labelField: [allowed values]}.
     // The FR-10 validation layer fails closed when this is empty.
     controlledVocabulary: { type: mongoose.Schema.Types.Mixed, default: {} },

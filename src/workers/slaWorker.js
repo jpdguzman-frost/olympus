@@ -16,7 +16,7 @@
  */
 
 import { Card } from '../models/Card.js';
-import { escalateToFallback } from '../services/verdictService.js';
+import { escalateRoute } from '../services/verdictService.js';
 import { pushCardAudit, recordAudit } from '../services/auditService.js';
 import { workingDaysBetween } from '../utils/workingDays.js';
 import { SLA_CHASE_1_DAYS, SLA_CHASE_2_DAYS, SLA_ESCALATE_DAYS } from '../config/constants.js';
@@ -45,46 +45,77 @@ export async function runSlaPass({ now = new Date() } = {}) {
   try {
     const cards = await Card.find({
       status: { $in: ['routed', 'ruled', 'reassigned'] },
-      'nomination.routedTo': { $ne: null },
+      $or: [{ 'nomination.routedTo': { $ne: null } }, { 'nomination.routes.0': { $exists: true } }],
     });
 
     for (const card of cards) {
-      if (card.nomination.escalationHalted) continue; // JP resolves manually
-      const clockStart = card.nomination.reassignedAt || card.nomination.routedAt;
-      if (!clockStart) continue;
-      const aged = workingDaysBetween(clockStart, now);
-      const autoChases = (card.nomination.chases || []).filter(
-        (c) => c.kind === 'auto-chase' && c.at >= clockStart,
-      ).length;
+      // C2v2: each route carries its own clock, chases, and escalation.
+      // Legacy single-route cards synthesize one route from the old fields.
+      const legacy = !card.nomination.routes?.length;
+      const routes = legacy
+        ? [
+            {
+              reviewerId: card.nomination.routedTo,
+              routedAt: card.nomination.routedAt,
+              reassignedAt: card.nomination.reassignedAt,
+              chases: card.nomination.chases,
+              escalationHalted: card.nomination.escalationHalted,
+            },
+          ]
+        : card.nomination.routes;
 
-      if (aged >= SLA_ESCALATE_DAYS && autoChases >= 2 && card.status !== 'reassigned') {
-        pushCardAudit(card, {
-          by: null,
-          action: 'sla-escalation',
-          note: `${aged} working days without a verdict after two chases — escalating (A5)`,
-        });
-        await escalateToFallback(card, 'sla', null);
-        outcomes.push({ cardId: card._id, outcome: 'escalated' });
-      } else if (
-        (aged >= SLA_CHASE_2_DAYS && autoChases === 1) ||
-        (aged >= SLA_CHASE_1_DAYS && autoChases === 0)
-      ) {
-        card.nomination.chases.push({ kind: 'auto-chase', by: null, at: now });
-        pushCardAudit(card, {
-          by: null,
-          action: 'auto-chase',
-          note: `${aged} working days without a verdict (chase ${autoChases + 1} of 2)`,
-        });
-        await card.save();
-        await recordAudit({
-          actorId: null,
-          action: 'card.auto-chase',
-          entity: 'card',
-          entityId: card._id,
-          after: { agedWorkingDays: aged, chase: autoChases + 1 },
-        });
-        outcomes.push({ cardId: card._id, outcome: `chase-${autoChases + 1}` });
+      let dirty = false;
+      for (const route of routes) {
+        if (route.escalationHalted) continue; // JP resolves manually
+        // Only routes with lines still waiting on a verdict.
+        const undecided = card.claims.some((c) =>
+          (c.checkerId ? c.checkerId.equals(route.reviewerId) : c.talentApproved || c.verdict) &&
+          (c.talentApproved || c.verdict) &&
+          c.verdict === null,
+        );
+        if (!undecided && !legacy) continue;
+        const clockStart = route.reassignedAt || route.routedAt;
+        if (!clockStart) continue;
+        const aged = workingDaysBetween(clockStart, now);
+        const autoChases = (route.chases || []).filter(
+          (c) => c.kind === 'auto-chase' && c.at >= clockStart,
+        ).length;
+        // A reassigned route gets chases but no second auto-escalation —
+        // a stuck fallback is JP's call, visible on the dashboard.
+        const alreadyReassigned = legacy ? card.status === 'reassigned' : Boolean(route.reassignedAt);
+
+        if (aged >= SLA_ESCALATE_DAYS && autoChases >= 2 && !alreadyReassigned) {
+          pushCardAudit(card, {
+            by: null,
+            action: 'sla-escalation',
+            note: `${aged} working days without a verdict after two chases — escalating (A5)`,
+          });
+          await escalateRoute(card, route.reviewerId, 'sla', null); // saves the card itself
+          outcomes.push({ cardId: card._id, outcome: 'escalated' });
+          dirty = false;
+          break; // one action per card per pass — the routes array just changed
+        } else if (
+          (aged >= SLA_CHASE_2_DAYS && autoChases === 1) ||
+          (aged >= SLA_CHASE_1_DAYS && autoChases === 0)
+        ) {
+          route.chases.push({ kind: 'auto-chase', by: null, at: now });
+          pushCardAudit(card, {
+            by: null,
+            action: 'auto-chase',
+            note: `${aged} working days without a verdict (chase ${autoChases + 1} of 2)`,
+          });
+          dirty = true;
+          await recordAudit({
+            actorId: null,
+            action: 'card.auto-chase',
+            entity: 'card',
+            entityId: card._id,
+            after: { agedWorkingDays: aged, chase: autoChases + 1 },
+          });
+          outcomes.push({ cardId: card._id, outcome: `chase-${autoChases + 1}` });
+        }
       }
+      if (dirty) await card.save();
     }
   } finally {
     running = false;

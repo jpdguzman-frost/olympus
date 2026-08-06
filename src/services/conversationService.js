@@ -217,3 +217,256 @@ export async function converse(actor, cardId, { text = null, client = null } = {
 
   return { card, turn };
 }
+
+// ---------------------------------------------------------------------------
+// C2v2 (JP, Aug 6) — per-line talk-it-out threads + bolt-in/signal threads
+// ---------------------------------------------------------------------------
+
+const MAX_THREAD_AI_TURNS = 6; // a thread is a clarification, never a second interview
+
+/** One short AI turn inside a thread. Sonnet; system prompt cached. */
+async function threadAiTurn(track, client, { frameLines, thread, readyKey }) {
+  const transcript = thread.map((t) => `${t.role === 'ai' ? 'YOU' : 'TALENT'}: ${t.text}`);
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['message', readyKey],
+    properties: { message: { type: 'string' }, [readyKey]: { type: 'boolean' } },
+  };
+  const response = await (client ?? getClient()).messages.create({
+    model: MODEL,
+    max_tokens: 1000,
+    system: [{ type: 'text', text: composeSystemPrompt(track), cache_control: { type: 'ephemeral' } }],
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: [
+              ...frameLines,
+              '',
+              'VOICE: English. Approachable yet professional. Simple words. No hype. Neutral.',
+              'ONE short message at a time. Never state a level, a score, or a reading. Output only the schema.',
+            ].join('\n'),
+            cache_control: { type: 'ephemeral' },
+          },
+          {
+            type: 'text',
+            text: ['THE THREAD SO FAR:', ...(transcript.length ? transcript : ['(none — you open it)']), '', 'Respond now.'].join('\n'),
+          },
+        ],
+      },
+    ],
+    output_config: { format: { type: 'json_schema', schema } },
+  });
+  const textBlock = response.content.find((b) => b.type === 'text');
+  if (!textBlock) throw new Error('No thread turn returned');
+  const parsed = JSON.parse(textBlock.text);
+  return { message: parsed.message, ready: Boolean(parsed[readyKey]) };
+}
+
+/**
+ * The per-line thread: the talent clarifies a line, argues with its
+ * rationale, or adds the missing piece — in their own words, in place.
+ * Their words persist verbatim into rawAnswers BEFORE any AI call
+ * (Invariant 15), so everything said here is quotable. Closing the
+ * thread (the model has enough, the talent says re-check, or the cap)
+ * opens a contention — the existing re-map loop answers it within a
+ * minute, and a mapping is never final over the talent's objection.
+ */
+export async function lineThread(actor, cardId, claimId, { text = null, close = false, client = null } = {}) {
+  const card = await Card.findById(cardId);
+  if (!card) throw notFound('Card not found');
+  if (!card.talentId.equals(actor._id)) throw forbidden('Only the card\'s talent can talk on their card');
+  if (!actor.hasRole('talent')) throw forbidden('Talent role required');
+  if (!['structured', 'adjust'].includes(card.status)) {
+    throw conflict(`This line can't be talked out right now (status "${card.status}")`);
+  }
+  const claim = card.claims.id(claimId);
+  if (!claim) throw notFound('Line not found');
+  if ((claim.contentions || []).some((c) => c.outcome === null)) {
+    throw conflict('This line is already being re-checked — the answer lands here shortly');
+  }
+
+  const track = await Track.findOne({ key: card.track });
+  if (!track || !trackReadyForStructuring(track)) {
+    throw conflict('The assistant is not ready on this track yet — ask JP');
+  }
+
+  if (text?.trim()) {
+    const clean = String(text).trim();
+    claim.thread.push({ role: 'talent', text: clean });
+    // Invariant 15: the talent's words persist — and become quotable —
+    // before any AI call.
+    card.rawAnswers.push({
+      questionIndex: null,
+      question: `About the line: ${claim.competencyOrDomain}`,
+      answer: clean,
+      at: new Date(),
+    });
+    await card.save();
+  }
+
+  const talentWords = claim.thread.filter((t) => t.role === 'talent').map((t) => t.text);
+  if (!talentWords.length) throw badRequest('Say what you want checked or added on this line first');
+
+  const aiTurns = claim.thread.filter((t) => t.role === 'ai').length;
+  let ready = close || aiTurns >= MAX_THREAD_AI_TURNS;
+  let message = 'Got it — the line is being re-checked against your words. The answer lands on the line in about a minute.';
+
+  if (!ready) {
+    const turn = await threadAiTurn(track, client, {
+      readyKey: 'readyToRecheck',
+      thread: claim.thread,
+      frameLines: [
+        'YOUR TASK — a short talk-it-out thread on ONE drafted line (mechanical frame; your rules govern the substance):',
+        'THE LINE (drafted from the talent\'s words):',
+        JSON.stringify({
+          competencyOrDomain: claim.competencyOrDomain,
+          labels: claim.labels,
+          sourceQuote: claim.sourceQuote,
+          anchor: claim.anchorText,
+          flags: claim.flags,
+          rationale: claim.rationale,
+          missingPiece: claim.missingPiece,
+        }),
+        'The talent is clarifying this line, arguing with its reading, or adding the missing piece.',
+        'Ask AT MOST what is needed to re-check the line — one short question at a time; never re-interview.',
+        'The moment you have enough (the missing piece said plainly, or the objection clear), set',
+        'readyToRecheck=true and tell them plainly: the line gets re-checked and the answer lands on it',
+        'in about a minute.',
+      ],
+    });
+    ready = turn.ready;
+    message = turn.message;
+    claim.thread.push({ role: 'ai', text: turn.message });
+  }
+
+  if (ready) {
+    // The thread's words feed the existing contention loop — same wall,
+    // same worker, same "never final over their objection" guarantee.
+    claim.contentions.push({
+      text: `The talent talked this line out: ${talentWords.join(' — ')}`,
+      at: new Date(),
+      outcome: null,
+    });
+    claim.talentApproved = false;
+    claim.needsRelook = false;
+    if (aiTurns >= MAX_THREAD_AI_TURNS && !close) {
+      claim.thread.push({ role: 'ai', text: message });
+    }
+  }
+
+  pushCardAudit(card, { by: actor._id, action: 'line-thread-turn', note: ready ? 'closed → re-check' : 'question' });
+  await card.save();
+  return { card, claim, turn: { message, ready } };
+}
+
+/**
+ * Bolt-in / signal threads: the talent taps an add-on from the FULL
+ * bolt-in list (JP: "they can't claim what they can't see") or claims a
+ * noted signal; a small contextual chat gathers enough, then the worker
+ * drafts the line through the same wall as everything else. Talent
+ * words persist verbatim first (Invariant 15).
+ */
+export async function boltInThread(actor, cardId, { threadId = null, competency = null, signal = null, text = null, close = false, client = null } = {}) {
+  const card = await Card.findById(cardId);
+  if (!card) throw notFound('Card not found');
+  if (!card.talentId.equals(actor._id)) throw forbidden('Only the card\'s talent can talk on their card');
+  if (!actor.hasRole('talent')) throw forbidden('Talent role required');
+  if (card.status !== 'structured') {
+    throw conflict(`Add-ons are claimed while you check the write-up (status "${card.status}")`);
+  }
+
+  const track = await Track.findOne({ key: card.track });
+  if (!track || !trackReadyForStructuring(track)) {
+    throw conflict('The assistant is not ready on this track yet — ask JP');
+  }
+
+  let thread;
+  if (threadId) {
+    thread = card.boltInThreads.id(threadId);
+    if (!thread) throw notFound('Thread not found');
+    if (thread.status === 'structuring') throw conflict('This one is already being written up — it lands on your card in about a minute');
+    if (thread.status !== 'open') thread.status = 'open'; // re-open a done/nothing thread to add more
+  } else {
+    if (!competency && !signal?.trim()) throw badRequest('Pick an add-on from the list, or a noted signal');
+    if (competency && !track.competencyOrDomainList.includes(competency)) {
+      throw badRequest('That add-on is not on the list');
+    }
+    thread =
+      card.boltInThreads.find(
+        (t) => t.status === 'open' && ((competency && t.competency === competency) || (signal && t.fromSignal === signal)),
+      ) ?? card.boltInThreads[card.boltInThreads.push({ competency: competency ?? null, fromSignal: signal?.trim() || null, thread: [], status: 'open' }) - 1];
+  }
+
+  if (text?.trim()) {
+    const clean = String(text).trim();
+    thread.thread.push({ role: 'talent', text: clean });
+    card.rawAnswers.push({
+      questionIndex: null,
+      question: thread.fromSignal
+        ? `Claiming a noted signal: ${thread.fromSignal}`
+        : `About ${thread.competency ?? 'an add-on'} on this project`,
+      answer: clean,
+      at: new Date(),
+    });
+    await card.save();
+  }
+
+  const subjectLine = thread.fromSignal
+    ? `They are claiming something first noted as a signal: "${thread.fromSignal}".`
+    : `They tapped "${thread.competency}" from the add-on list for this project.`;
+  const talentWords = thread.thread.filter((t) => t.role === 'talent').map((t) => t.text);
+  const aiTurns = thread.thread.filter((t) => t.role === 'ai').length;
+
+  // Opening turn: the AI asks the one contextual question that starts it.
+  if (!talentWords.length) {
+    const turn = await threadAiTurn(track, client, {
+      readyKey: 'readyToDraft',
+      thread: thread.thread,
+      frameLines: [
+        'YOUR TASK — open a short add-on thread (mechanical frame; your rules govern the substance):',
+        subjectLine,
+        `Project: ${card.subject.name}.`,
+        'Ask ONE short opening question that helps them tell it: what they did, where, since when.',
+        'readyToDraft stays false on this opening turn.',
+      ],
+    });
+    thread.thread.push({ role: 'ai', text: turn.message });
+    await card.save();
+    return { card, thread, turn: { message: turn.message, ready: false } };
+  }
+
+  let ready = close || aiTurns >= MAX_THREAD_AI_TURNS;
+  let message = 'Got it — this is being written into a line. It lands on your card in about a minute.';
+  if (!ready) {
+    const turn = await threadAiTurn(track, client, {
+      readyKey: 'readyToDraft',
+      thread: thread.thread,
+      frameLines: [
+        'YOUR TASK — a short add-on thread (mechanical frame; your rules govern the substance):',
+        subjectLine,
+        `Project: ${card.subject.name}.`,
+        'Gather just enough for a claim line: what they did, where, since when, who made the calls.',
+        'One short question at a time — never re-interview. The moment their words could support a',
+        'line (even a thin draft), set readyToDraft=true and tell them plainly: it gets written into',
+        'a line and lands on their card in about a minute.',
+      ],
+    });
+    ready = turn.ready;
+    message = turn.message;
+    thread.thread.push({ role: 'ai', text: turn.message });
+  }
+
+  if (ready) {
+    thread.status = 'structuring';
+    thread.response = null;
+    if (aiTurns >= MAX_THREAD_AI_TURNS && !close) thread.thread.push({ role: 'ai', text: message });
+  }
+
+  pushCardAudit(card, { by: actor._id, action: 'bolt-in-thread-turn', note: ready ? 'closed → drafting' : 'question' });
+  await card.save();
+  return { card, thread, turn: { message, ready } };
+}

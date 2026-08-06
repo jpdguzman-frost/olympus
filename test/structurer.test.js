@@ -79,9 +79,9 @@ beforeEach(async () => {
 
 afterAll(() => ctx.teardown());
 
-describe('calibration corrections count toward the GATE-1 streak', () => {
-  it('an edit increments the correction counter and keeps the anchor; release with zero stays clean', async () => {
-    const { correctClaim, cleanStreaks, releaseCard } = await import('../src/services/calibrationService.js');
+describe('spot-check corrections count toward the GATE-1 streak', () => {
+  it('an edit increments the correction counter and keeps the anchor; a corrected card breaks the streak', async () => {
+    const { correctClaim, cleanStreaks } = await import('../src/services/calibrationService.js');
     const { User } = await import('../src/models/User.js');
     const admin = await User.findOne({ email: 'admin@frostdesigngroup.com' });
 
@@ -90,7 +90,7 @@ describe('calibration corrections count toward the GATE-1 streak', () => {
       type: 'claim', competencyOrDomain: 'build-ops', labels: { execution: 'Someone checks behind me' },
       sourceQuote: 'I run it weekly.', anchorText: 'GCash, April 2026', anchorSource: 'structurer', flags: [],
     });
-    card.calibrationHold = true;
+    card.status = 'structured'; // in the fix window
     await card.save();
 
     await correctClaim(admin, card._id, card.claims[0]._id, { action: 'edit', labels: { execution: 'I run it' } });
@@ -100,10 +100,53 @@ describe('calibration corrections count toward the GATE-1 streak', () => {
     expect(stored.claims[0].anchorText).toBe('GCash, April 2026'); // the anchor rides through
     expect(stored.claims[0].labels.execution).toBe('I run it');
 
-    await releaseCard(admin, card._id);
+    // The streak counts cards that REACHED A CHECKER clean — push this
+    // corrected one past the fix window and it breaks the streak.
+    await Card.updateOne({ _id: card._id }, { status: 'routed' });
     const streaks = await cleanStreaks();
     const ops = streaks.find((t) => t.track === 'ops');
     expect(ops.cleanStreak).toBe(0); // corrected card broke the streak
+  });
+
+  it('the fix window (JP, Aug 6): a fix after send pulls the line back; once routed it is log-only', async () => {
+    const { correctClaim } = await import('../src/services/calibrationService.js');
+    const { User } = await import('../src/models/User.js');
+    const { Card } = await import('../src/models/Card.js');
+    const admin = await User.findOne({ email: 'admin@frostdesigngroup.com' });
+
+    // Sent, waiting on a sign-off: the talent approved the line at send.
+    const sent = await submittedCard(agent(), 'Fix Window Sent');
+    sent.claims.push({
+      type: 'claim', competencyOrDomain: 'build-ops', labels: { execution: 'I run it' },
+      sourceQuote: 'I run it weekly.', anchorText: 'GCash, April 2026', anchorSource: 'structurer', flags: [],
+      talentApproved: true, checkerId: admin._id,
+    });
+    sent.status = 'exposure-signoff';
+    await sent.save();
+    const pulled = await correctClaim(admin, sent._id, sent.claims[0]._id, { action: 'edit', labels: { execution: 'Someone checks behind me' } });
+    expect(pulled.pulledBack).toBe(true);
+    const pulledStored = await Card.findById(sent._id);
+    expect(pulledStored.claims[0].talentApproved).toBe(false); // back for the re-look
+    expect(pulledStored.claims[0].checkerId).toBe(null); // no checker judges unapproved text
+    expect(pulledStored.claims[0].needsRelook).toBe(true);
+
+    // Routed: the window is closed — log-only, the card unchanged.
+    const routed = await submittedCard(agent(), 'Fix Window Routed');
+    routed.claims.push({
+      type: 'claim', competencyOrDomain: 'build-ops', labels: { execution: 'I run it' },
+      sourceQuote: 'I run it weekly.', anchorText: 'GCash, April 2026', anchorSource: 'structurer', flags: [],
+      talentApproved: true,
+    });
+    routed.status = 'routed';
+    await routed.save();
+    const logOnly = await correctClaim(admin, routed._id, routed.claims[0]._id, { action: 'edit', labels: { execution: 'Someone checks behind me' } });
+    expect(logOnly.logOnly).toBe(true);
+    const untouched = await Card.findById(routed._id);
+    expect(untouched.claims[0].labels.execution).toBe('I run it'); // nothing changed
+    expect(untouched.calibrationCorrections).toBe(0);
+    const { AuditLog } = await import('../src/models/AuditLog.js');
+    const note = await AuditLog.findOne({ action: 'card.calibration-note', entityId: routed._id });
+    expect(note).toBeTruthy(); // but the calibration input is on the record
   });
 });
 
@@ -270,71 +313,59 @@ describe('structuring worker (AC-8: kill the AI, raw intact, retry succeeds)', (
     expect((await Card.findById(card._id)).status).toBe('draft');
   });
 
-  it('calibration mode ON puts the structured card on hold (FR-11)', async () => {
+  it('a structured card goes straight to the talent — the hold is retired (JP, Aug 6)', async () => {
     const card = await submittedCard(talent, 'Calibrated Card');
-    await structureOne(card, { client: fakeClient({ claims: [GOOD_CLAIM], followUps: [] }) });
-    expect((await Card.findById(card._id)).calibrationHold).toBe(true);
-  });
-
-  it('calibration mode OFF releases directly to the talent', async () => {
-    await Track.updateOne({ key: 'ops' }, { calibrationMode: false });
-    const card = await submittedCard(talent, 'Post-Gate Card');
     await structureOne(card, { client: fakeClient({ claims: [GOOD_CLAIM], followUps: [] }) });
     expect((await Card.findById(card._id)).calibrationHold).toBe(false);
   });
 });
 
-describe('calibration queue (FR-11)', () => {
-  let held;
+describe('spot-check queue (replaces the FR-11 hold)', () => {
+  let released;
 
   beforeEach(async () => {
-    held = await submittedCard(talent, `Held ${Date.now()}`);
-    await structureOne(held, { client: fakeClient({ claims: [GOOD_CLAIM], followUps: [] }) });
-    held = await Card.findById(held._id);
+    released = await submittedCard(talent, `Released ${Date.now()}`);
+    await structureOne(released, { client: fakeClient({ claims: [GOOD_CLAIM], followUps: [] }) });
+    released = await Card.findById(released._id);
   });
 
-  it('the talent cannot see claims while the card holds', async () => {
-    const res = await talent.get(`/api/cards/${held._id}`);
-    expect(res.body.data.claims).toHaveLength(0);
-    expect(res.body.data.inCalibration).toBe(true);
+  it('the talent sees their lines the moment structuring lands', async () => {
+    const res = await talent.get(`/api/cards/${released._id}`);
+    expect(res.body.data.claims).toHaveLength(1);
+    expect(res.body.data.inCalibration).toBeUndefined();
   });
 
-  it('admin sees the held card in the queue, with claims', async () => {
+  it('admin sees the released card in the spot-check list, with claims', async () => {
     const res = await admin.get('/api/admin/calibration');
-    const found = res.body.data.find((c) => c._id === held._id.toString());
+    const found = res.body.data.find((c) => c._id === released._id.toString());
     expect(found).toBeTruthy();
     expect(found.claims).toHaveLength(1);
   });
 
   it('an admin correction is validated (FR-10 applies to JP too) and audited', async () => {
-    const claimId = held.claims[0]._id.toString();
+    const claimId = released.claims[0]._id.toString();
 
-    const bad = await admin.post(`/api/admin/calibration/${held._id}/claims/${claimId}`).send({
+    const bad = await admin.post(`/api/admin/calibration/${released._id}/claims/${claimId}`).send({
       action: 'edit',
       labels: { execution: 'Definitely a level 5' },
     });
     expect(bad.status).toBe(400);
 
-    const good = await admin.post(`/api/admin/calibration/${held._id}/claims/${claimId}`).send({
+    const good = await admin.post(`/api/admin/calibration/${released._id}/claims/${claimId}`).send({
       action: 'edit',
       labels: { execution: 'Someone checks behind me' },
     });
     expect(good.status).toBe(200);
-    expect(good.body.data.claims[0].labels.execution).toBe('Someone checks behind me');
+    expect(good.body.data.card.claims[0].labels.execution).toBe('Someone checks behind me');
+    expect(good.body.data.logOnly).toBe(false);
 
-    const audit = await admin.get(`/api/admin/audit?entity=card&entityId=${held._id}`);
+    const audit = await admin.get(`/api/admin/audit?entity=card&entityId=${released._id}`);
     expect(audit.body.data.some((e) => e.action === 'card.calibration-edit')).toBe(true);
   });
 
-  it('release makes the claims visible to the talent', async () => {
-    await admin.post(`/api/admin/calibration/${held._id}/release`);
-    const res = await talent.get(`/api/cards/${held._id}`);
-    expect(res.body.data.claims).toHaveLength(1);
-    expect(res.body.data.inCalibration).toBeUndefined();
-  });
-
-  it('non-admins cannot touch the calibration surface', async () => {
+  it('non-admins cannot touch the spot-check surface', async () => {
     expect((await talent.get('/api/admin/calibration')).status).toBe(403);
-    expect((await talent.post(`/api/admin/calibration/${held._id}/release`)).status).toBe(403);
+    const claimId = released.claims[0]._id.toString();
+    expect((await talent.post(`/api/admin/calibration/${released._id}/claims/${claimId}`).send({ action: 'remove' })).status).toBe(403);
   });
 });

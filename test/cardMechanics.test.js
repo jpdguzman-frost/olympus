@@ -302,16 +302,18 @@ describe('A4 signals noted, not claimed', () => {
     expect(rejected.some((r) => r.reason.match(/Signal quote/))).toBe(true);
   });
 
-  it('signals are stripped during calibration hold and the admin resurface list sees them (C9 hook)', async () => {
+  it('signals show to the talent right away (no hold — JP spot-checks) and the admin resurface list sees them (C9 hook)', async () => {
     const card = await structuredCard('Signal Card');
     await Card.updateOne(
       { _id: card._id },
-      { signalsNoted: [{ signal: 'Review authority seen', sourceQuote: 'I run it daily on GCash since April.', at: new Date() }], calibrationHold: true },
+      { signalsNoted: [{ signal: 'Review authority seen', sourceQuote: 'I run it daily on GCash since April.', at: new Date() }] },
     );
 
+    // Spot-check model (JP, Aug 6): nothing waits for JP — the talent
+    // sees their lines and signals the moment structuring lands.
     const talentView = await agents.talentA.get(`/api/cards/${card._id}`);
-    expect(talentView.body.data.signalsNoted).toEqual([]);
-    expect(talentView.body.data.inCalibration).toBe(true);
+    expect(talentView.body.data.signalsNoted).toHaveLength(1);
+    expect(talentView.body.data.inCalibration).toBeUndefined();
 
     const resurface = await agents.admin.get('/api/admin/signals');
     expect(resurface.status).toBe(200);
@@ -319,7 +321,6 @@ describe('A4 signals noted, not claimed', () => {
     expect(row.signalsNoted[0].signal).toBe('Review authority seen');
 
     expect((await agents.talentA.get('/api/admin/signals')).status).toBe(403);
-    await Card.updateOne({ _id: card._id }, { calibrationHold: false });
   });
 });
 

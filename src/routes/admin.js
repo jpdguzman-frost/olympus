@@ -198,10 +198,13 @@ router.get('/api/admin/calibration-insight', async (req, res, next) => {
   }
 });
 
-// --- Calibration review (FR-11; admin-only per Plan §4 matrix) ---
+// --- Spot-check review (JP, Aug 6 — replaces the calibration hold;
+// admin-only per Plan §4 matrix). Corrections respect the fix window:
+// applied freely pre-send, pull the line back during the sign-off wait,
+// log-only once routed.
 router.get('/api/admin/calibration', async (req, res, next) => {
   try {
-    sendSuccess(res, await calibration.listCalibrationQueue());
+    sendSuccess(res, await calibration.listSpotCheck());
   } catch (err) {
     next(err);
   }
@@ -210,14 +213,6 @@ router.get('/api/admin/calibration', async (req, res, next) => {
 router.post('/api/admin/calibration/:cardId/claims/:claimId', async (req, res, next) => {
   try {
     sendSuccess(res, await calibration.correctClaim(req.currentUser, req.params.cardId, req.params.claimId, req.body ?? {}));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/api/admin/calibration/:cardId/release', async (req, res, next) => {
-  try {
-    sendSuccess(res, await calibration.releaseCard(req.currentUser, req.params.cardId));
   } catch (err) {
     next(err);
   }
@@ -265,7 +260,7 @@ router.post('/api/admin/cards/:id/ruling', async (req, res, next) => {
 
 router.post('/api/admin/cards/:id/nudge', async (req, res, next) => {
   try {
-    sendSuccess(res, await verdictFlow.nudge(req.currentUser, req.params.id));
+    sendSuccess(res, await verdictFlow.nudge(req.currentUser, req.params.id, req.body?.reviewerId ?? null));
   } catch (err) {
     next(err);
   }
