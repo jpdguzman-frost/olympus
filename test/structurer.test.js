@@ -77,6 +77,56 @@ beforeEach(async () => {
 
 afterAll(() => ctx.teardown());
 
+describe('collapse rescue (one retry with the minimal render)', () => {
+  function stubThenGood() {
+    let calls = 0;
+    return {
+      count: () => calls,
+      messages: {
+        create: async () => {
+          calls += 1;
+          const out = calls === 1
+            ? { claims: [{ type: 'x', competencyOrDomain: 'build-ops', labels: {}, sourceQuote: '', flags: [], anchor: '' }], followUps: [], signalsNoted: [] }
+            : { claims: [GOOD_CLAIM], followUps: [], signalsNoted: [] };
+          return { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(out) }] };
+        },
+      },
+    };
+  }
+
+  it('a placeholder collapse on substantive words retries once minimal and recovers', async () => {
+    const { structureCard } = await import('../src/services/structurerService.js');
+    const client = stubThenGood();
+    const cardStub = {
+      subject: { kind: 'project', name: 'X' },
+      closeDate: null,
+      captureMode: 'conversation',
+      conversation: [{ role: 'ai', kind: 'question', text: 'q' }, { role: 'talent', kind: 'answer', text: 'I run it weekly. Miguel checks behind me before release.' }],
+      rawAnswers: [{ questionIndex: null, question: 'q', answer: 'I run it weekly. Miguel checks behind me before release.' }],
+      sweepAnswers: [{ prompt: 's', answer: 'Not me for the rest.' }],
+    };
+    const result = await structureCard(track, cardStub, { client });
+    expect(client.count()).toBe(2);
+    expect(result.claims).toHaveLength(1);
+    expect(result.rescued).toBe(true);
+  });
+
+  it('a successful first pass never triggers a second call', async () => {
+    const { structureCard } = await import('../src/services/structurerService.js');
+    let calls = 0;
+    const client = { messages: { create: async () => { calls += 1; return { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ claims: [GOOD_CLAIM], followUps: [], signalsNoted: [] }) }] }; } } };
+    const cardStub = {
+      subject: { kind: 'project', name: 'X' },
+      closeDate: null,
+      rawAnswers: [{ questionIndex: 0, question: 'Q1', answer: 'I run it weekly. Miguel checks behind me before release.' }],
+      sweepAnswers: [],
+    };
+    const result = await structureCard(track, cardStub, { client });
+    expect(calls).toBe(1);
+    expect(result.claims).toHaveLength(1);
+  });
+});
+
 describe('FR-10 validation layer (fails closed)', () => {
   const cardStub = {
     rawAnswers: [{ answer: 'I run it weekly. Miguel checks behind me before release.' }],

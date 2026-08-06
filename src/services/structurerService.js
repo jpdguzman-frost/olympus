@@ -153,12 +153,21 @@ export function buildOutputSchema(track) {
   };
 }
 
-function renderCardInput(card, capsScaffold = null) {
+function renderCardInput(card, capsScaffold = null, { minimal = false } = {}) {
   const parts = [
     `SUBJECT (${card.subject.kind}): ${card.subject.name}`,
     `CLOSE DATE: ${card.closeDate ? card.closeDate.toISOString().slice(0, 10) : 'not set'}`,
   ];
-  if (card.captureMode === 'conversation' && card.conversation?.length) {
+  if (minimal) {
+    // The rescue render: talent words only, no transcript, no scaffold —
+    // the shape that reliably structures when the full render collapses.
+    parts.push(
+      '',
+      "THE TALENT'S WORDS (each line verbatim — quote only exact substrings of these):",
+      ...card.rawAnswers.map((a) => `- ${a.answer}`),
+      ...card.sweepAnswers.map((s) => `- (sweep) ${s.answer}`),
+    );
+  } else if (card.captureMode === 'conversation' && card.conversation?.length) {
     // B7: the capture ran as a conversation. Only TALENT turns are
     // evidence — the FR-10 verbatim check reads rawAnswers, which holds
     // exactly the talent's words. The interview transcript is context;
@@ -238,18 +247,14 @@ function renderCardInput(card, capsScaffold = null) {
  * Throws StructuringError on refusal/AI failure — the caller leaves the
  * card in draft with raw intact (Invariant 15 / AC-8).
  */
-export async function structureCard(track, card, { client = getClient(), capsScaffold = null } = {}) {
-  if (!trackReadyForStructuring(track)) {
-    throw new StructuringError('awaiting-pack', `Track "${track.key}" has no vocabulary pack loaded`);
-  }
-
+async function structuringAttempt(track, card, client, capsScaffold, renderOpts) {
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 16000,
     // Prompt caching: the pack+behavior system prompt is identical for
     // every card on the track.
     system: [{ type: 'text', text: composeSystemPrompt(track), cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: renderCardInput(card, capsScaffold) }],
+    messages: [{ role: 'user', content: renderCardInput(card, capsScaffold, renderOpts) }],
     output_config: { format: { type: 'json_schema', schema: buildOutputSchema(track) } },
   });
 
@@ -270,6 +275,30 @@ export async function structureCard(track, card, { client = getClient(), capsSca
   }
 
   return validateStructuredOutput(track, card, parsed);
+}
+
+export async function structureCard(track, card, { client = getClient(), capsScaffold = null } = {}) {
+  if (!trackReadyForStructuring(track)) {
+    throw new StructuringError('awaiting-pack', `Track "${track.key}" has no vocabulary pack loaded`);
+  }
+
+  const result = await structuringAttempt(track, card, client, capsScaffold, { minimal: false });
+
+  // Collapse rescue: certain inputs make the model emit a placeholder
+  // row (observed live: date-less answers; meta-lines; verbose
+  // transcripts). If substantive words produced ZERO surviving claims,
+  // retry ONCE with the minimal talent-words-only render — the shape
+  // that reliably structures. Fails closed either way: zero can still
+  // be the honest answer (out-of-domain words map to nothing).
+  const substantive = card.rawAnswers.map((a) => a.answer).join(' ').trim().length > 40;
+  if (result.claims.length === 0 && substantive) {
+    const rescue = await structuringAttempt(track, card, client, capsScaffold, { minimal: true });
+    if (rescue.claims.length > 0) {
+      rescue.rescued = true;
+      return rescue;
+    }
+  }
+  return result;
 }
 
 export class StructuringError extends Error {
