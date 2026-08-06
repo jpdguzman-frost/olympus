@@ -1,114 +1,112 @@
-# Olympus — Session Handoff (2026-08-05)
+# Olympus — Session Handoff (2026-08-06)
 
-Read this + `CLAUDE.md` + `docs/JP-REVIEW.md` to resume with full context.
-The three seed documents (`Olympus__CLAUDE.md` constitution, `Olympus__BRD.md`,
-`Olympus__Implementation_Plan.md`) remain law; the 17 invariants are non-negotiable.
+Read this + `CLAUDE.md` (reply format, verbatim-critical) to resume.
 
-## Where the build stands
+## Governance chain (precedence, top wins)
 
-| Phase | State |
-|---|---|
-| P1 auth/roles/model/audit | DONE, tested |
-| P2 capture (questions, modes, drafts, sweep, shells) | DONE, tested |
-| P3 structurer + FR-10 validation + calibration queue | DONE, tested, ran live on real API |
-| P4 confirm/nominate/route/verdict/adjust cycle | DONE, tested, verified in browser |
-| P5 reader (derivation, ladder, quarterly) | DONE, parity fixtures pass |
-| P6 exporter + nudges | NOT BUILT — blocked by GATE-2 (JP parity confirmation) |
-| P7 pilot | Blocked by GATE-1 (calibration exit, AC-9) |
+1. 17 invariants (`Olympus__CLAUDE.md`) — Constitution v2 issues at
+   GATE-1 (adds the CAPS wall as Invariant 18; rewrites Invariant 4
+   per A1/C3). Do NOT edit the constitution file before then.
+2. `Olympus__Intake_Amendment_1.md` (ratified Aug 5) +
+   `Olympus__Rulings_2026-08-05.md` (C1–C9, OD-2) +
+   `Olympus__B7_Conversational_Capture_Spec.md` (approved Aug 5;
+   SUPERSEDES ruling C7 — one capture flow only).
+3. Aug 3 BRD/Plan where not amended.
+- Behavior: `Olympus__M0_Intent_v2.md` — CALIBRATING, stored as
+  versioned DATA (behavior_spec_versions), NEVER hard-coded; verbatim
+  port at GATE-1. Agent-drafted conversation addendum awaiting JP:
+  `Olympus__M0_Intent_v2.1_Conversation_DRAFT.md` (UNPUBLISHED).
+- Vocabulary: `Olympus__Pack_Ops_v0.4.md` canonical (sheet retired;
+  v0.2 deleted). A&A: sheet remains reference until A&A pack v0.4.
 
-104/104 tests. All pushed to `main` (github.com/jpdguzman-frost/olympus, SSH remote).
+## Build state — ALL packages DONE, 183/183 tests, pushed to main
 
-## Current focus (what JP asked for last)
+B1 pack split + role settings (7197cca) · B2 verdict mechanics/C1
+deadlock/SLA/JP dashboard (d8982fa) · B3 nomination rework/sign-off
+(20e71d6) · B4 anchoring/contention/signals/lifecycle (aa65d72) ·
+B5 CAPS CSV wall (27bf9e5) · B6 two doors → superseded by ·
+B7 conversational capture (24d3b9d) + fixes through 39b39e3.
+`Olympus__Build_Change_Plan_v1.md` has per-package detail.
 
-JP is walking the app **as a talent** to shape the experience-refinement arc.
-JP dumps raw friction notes; I turn them into the refinement queue.
-Known refinement items, in arc order (none started):
+## The amended flow (as built)
 
-1. **FR-8 sweep checklist** — sweep still asks a generic "anything else?";
-   should enumerate the track's unmentioned competencies now that packs are
-   loaded (per-item "not me"). The one spec-adjacent gap. Judgment-free — buildable now.
-2. **Liveness** — after submit/release/reject/adjust the talent must refresh;
-   add light auto-refresh (full notifications are P6). Judgment-free — buildable now.
-3. **Guided mode rhythm** — FR-3 says "guided chat"; today it's static blocks.
-   Biggest experience lift; wait for JP's tone notes before building.
-4. Mode-switch (guided↔single-pass) keeps separate text fields; nominee picker
-   is ungrouped; mobile widths unverified (BRD requires responsive web).
+Home lists talent's uncarded CAPS projects (+ "File something else")
+→ AI activity summary (cached; names/dates, NEVER counts) → Socratic
+one-question-at-a-time capture (Sonnet 5; skeleton = the 4 questions'
+intent; early wrap, 12-cap; post-wrap additions allowed; every talent
+turn persists verbatim PRE-AI-call; AI turns can never be quoted —
+structural) → structuring (Opus 5; anchor+signals in schema; collapse
+rescue = one retry with minimal talent-words render) → calibration
+hold (JP releases; corrections counted; clean-streak meter vs
+5-across-3; correction log = Pack §E feed, append-only audit_logs in
+MongoDB) → talent confirm (anchor gate "needs a date"; THIN-LINE RULE:
+'insufficient detail — draft' lines can't be approved/defended/fixed —
+add-detail re-checks via contention loop, or leave as costless draft;
+partial approval routes only approved lines, drafts invisible to
+reviewer, take no verdict, don't block confirm) → pick ONE confirmer
+(C2; rotation advisory C5) → CAPS auto-verify (3+ distinct review
+weeks) else exposure-verifier sign-off (C3 refusal returns pick) →
+verdict w/ required attestation → Adjust→defend→deadlock→JP ruling
+(guidance, never a verdict)→reviewer decides or refuses→fallback
+(OD-2 setting, exclusions, halts visibly) → SLA 10wd/2 chases.
+Leadership weeks ON HOLD (JP) — project tenure instead.
 
-## Waiting on JP (docs/JP-REVIEW.md — do not do these for him)
+## Models & infra
 
-1. Calibration rep: **Karen's GCash card held in the admin queue — leave it
-   untouched.** Two structurer rulings: may one quote feed two claims?
-   Is default-down + COULD-BE-HIGHER on "I decided alone" right?
-2. Five `[NEEDS JP]` markers in the two pack drafts — incl. the **Cascade
-   contradiction** (sheet says "Cascade reads 1"; JP's own Adjust feedback set
-   Gwyn's Cascade rows to rung 3).
-3. GATE-2 parity: app reads Karen **J2 → Mid**, Gwyn **Mid · Late**; two
-   `parityUnconfirmed` extrapolations in `readerService.js`. Also: sheet
-   displays "J2 · Mid-early" vs app's "J2 → Mid" — which string is canonical?
-4. OD-2 fallback names; 5. Google OAuth creds (deferred); 6. real user emails.
+- Conversation + summary: `claude-sonnet-5` (CONVERSATION_MODEL).
+  Structuring + remap: `claude-opus-5` (STRUCTURER_MODEL).
+- Prompt caching ON (system + conversation prefix blocks).
+- Workers: structurer+contention (15s), SLA (hourly), lifecycle (6h).
+- Scripts: `npm run import-caps -- <csv>` · `load-behavior-spec` ·
+  `load-packs` · seed/build/test as before. Server port 4600.
 
-## How to run / verify
+## Dev environment right now
 
-- `node server.js` (bg task may already be running) — http://localhost:4600,
-  port 4600. `.env` has MONGODB_URI (localhost/olympus), REDIS_URL, PORT,
-  ANTHROPIC_API_KEY (JP set it; never print it).
-- Local mongod + redis are brew services, already running.
-- Dev login (no Google creds set): JP admin = jpdguzman@frostdesigngroup.com;
-  dev cast = dev-karen/dev-jacob/dev-gwyn/dev-reviewer/dev-lead
-  @dev.olympus.invalid. Jacob's card was my E2E verification artifact
-  (confirmed, feeds his J1 ladder read); Karen's is JP's calibration rep.
-- `npm run build` = frontend (Ractive parse-checked, frontend/ → public/);
-  `npx vitest run` = suite; `npm run seed`; `npm run load-packs -- <track>
-  <version> <packFile> <vocabFile>`.
-- Browser verify via chrome-devtools MCP (kill orphaned
-  `chrome-devtools-mcp/chrome-profile` Chrome if connection blocked).
-  Screenshots 01–13 in `screenshots/` (gitignored).
+- CAPS: 23,080 rows imported (H1 2026); admin shows batch. Wall test
+  class = capsWall.test.js.
+- Mappings: dev-karen→Karen Ong · dev-gwyn→Gwyn Cristo · dev-jacob→
+  Jacob · dev-reviewer→Lea Villanueva (auto-verify demo: Gwyn +
+  GCash App + Reviewer). Verifier+fallback = Dev Lead, both tracks.
+- Karen was wiped (JP request), then filed ONE conversation card:
+  GCash App — in JP's calibration queue with 6 claims + 2 signals,
+  two lines thin-flagged (good demo of the new rule). Jacob's GCash
+  card also held. JP is mid talent-walkthrough.
+- API credits were topped up Aug 6 after running dry mid-test.
 
-## Architecture crib (Ares-parity, ESM, Express 5)
+## Live structurer findings (calibration inputs, keep!)
 
-- `server.js` bootstrap → `src/app.js` composition. Mongoose models in
-  `src/models/` (Card embeds claims/nomination/audit; VocabPackVersion +
-  AuditLog are append-only via pre-hooks). Status machine in
-  `src/config/constants.js` (draft→structured→talent-approved→
-  lead-nominee-review→routed→confirmed|adjust→revised→routed; reject leg
-  lead-nominee-review→talent-approved).
-- Services: `cardService` (CRUD, visibility matrix, presentCard hides claims
-  during calibrationHold + computes BR-4 stale), `confirmService` (P4:
-  decideClaim/approveCard/submitNomination+system checks/decideNomination/
-  repeatStreak/reroute), `structurerService` (claude-opus-5, pack verbatim as
-  system prompt, structured-output JSON schema with NO level field, FR-10
-  validateStructuredOutput fails closed, quotes must be verbatim substrings),
-  `calibrationService`, `readerService` (Ops pair scoring + A&A Levels table
-  verbatim), `auditService`, `statusMachine`, `seedService`.
-- `src/workers/structurerWorker.js` polls submitted drafts every 15s; failure
-  leaves draft+raw intact with backoff (AC-8); no pack → 'awaiting-pack'.
-- Verdict sovereignty: `applyVerdict` in cardService — assignment-based
-  (nomination.routedTo), admin rejected like everyone; Adjust clears
-  talentApproved (BR-7).
-- Frontend: `frontend/{styles,templates,scripts}` + shells → `build.js` →
-  `public/`. Ractive 1.4.2 (vendored). Pages: index (home/capture/detail SPA,
-  hash-routed), lead.html, admin.html, login.html. Design: "evidence ledger" —
-  IBM Plex, paper #f6f7f4, carbon blue #3d48b8, status stamps, verbatim quotes
-  in serif italic. No ranking UI anywhere (Invariant 12).
-- Packs live: v0.2-draft1 (ops) / v0.3-draft1 (artasset) published to dev DB
-  from `docs/phase1-structuring-prompt-*.md` + `docs/vocab-*.json` sidecars
-  (transcribed 1:1 from JP's two Google Sheets — letter-perfect vocab).
-  Zero-states ("Not Yet", "I don't do this") are deliberately unclaimable.
+- Collapse causes proven by bisection: (a) zero time-words in
+  evidence, (b) meta-lines like "This is good enough." Frame now
+  forbids placeholder rows + skips meta-lines; rescue retry covers
+  the rest. JP's real cards = best trap inputs so far.
+- Standing structurer rulings for JP's calibration: coverage rows for
+  unmentioned competencies ('not yet reached — not a gap' as claim
+  rows) vs Invariant 7; duplicate same-competency rows; Taglish quote
+  paraphrase (FR-10 drops those — behavior tuning matter).
 
-## Working agreement (verbatim-critical)
+## Waiting on JP
 
-Reply format in `CLAUDE.md`: HEADLINE / WHAT I NEED FROM YOU / STATUS (≤5
-bullets) / DETAIL below `---`. No process narration; [sure]/[likely]/[guess]
-tags; one screen; tables for 3+ items; keep decisions simple.
-JP wants judgment-free work done autonomously and JP-judgment items batched
-into `docs/JP-REVIEW.md`. Commit style: phase-scoped conventional messages +
-Claude co-author trailer, push to main directly.
+1. Calibrate + release the two held cards (thin-line UX demo inside).
+2. Publish behavior addendum v2.1 (edit the DRAFT, then
+   `npm run load-behavior-spec -- ops v2.1-calibrating <file>`).
+3. Pre-amendment items still open: A&A pack v0.4 delivery; Cascade
+   contradiction; GATE-2 parity confirms; OD-1; OD-3; OD-4 tuning;
+   OD-5 (derivation home — recommended: pack appendix; before M4=P5
+   per ratified C8 map); OAuth creds; real users at pilot.
+
+## Working agreement (unchanged, verbatim-critical)
+
+HEADLINE / WHAT I NEED FROM YOU / STATUS ≤5 / DETAIL under `---`.
+[sure]/[likely]/[guess]. J1-simple copy everywhere; describe by what
+happens, never role titles; pack vocabulary verbatim (Invariant 1).
+Judgment-free work runs autonomously; JP-judgment items batched.
+Commits: conventional + Claude co-author trailer, push to main.
 
 ## Immediate next actions on resume
 
-1. If JP delivered walkthrough notes → convert to refinement queue, build.
-2. Else: build refinement items 1–2 (sweep checklist, auto-refresh) — both
-   judgment-free and spec-adjacent.
-3. After JP confirms GATE-2 → build P6 (nightly one-way Sheets export FR-22
-   in the existing instrument format, nudges FR-21: 30d gentle prompt +
-   lead visibility list, never a penalty).
+1. JP continues the talent walkthrough — fix what he hits, his
+   feedback rules over everything generated.
+2. If he says "fold corrections in": draft behavior-rule amendments
+   from the correction log for his approval.
+3. Still unbuilt from the ORIGINAL plan: P6 exporter (FR-22, now
+   archive-mode per A8) + nudges (FR-21) — blocked by GATE-2.
