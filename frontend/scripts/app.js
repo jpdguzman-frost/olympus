@@ -78,6 +78,24 @@ const app = new Ractive({
     flagNudge,
     openContention: (claim) => (claim.contentions || []).some((c) => c.outcome === null),
     hasThreadWords: (t) => (t.thread || []).some((x) => x.role === 'talent'),
+    moreOpen: false,
+    // Option 1 (JP, Aug 6): a line collapses to name + state + quote.
+    collapsible: (c) => app.get('isDocScreen') && app.get('card.status') === 'structured' && !c.verdict,
+    // State the now, never the journey — two or three plain words.
+    lineState: (c) => {
+      if (c.leftOut) return 'Left out';
+      if (c.needsRelook) return 'Changed — read again';
+      if (!c.anchorText) return 'Needs a date';
+      if ((c.flags || []).includes('insufficient detail — draft')) return 'Needs one thing';
+      return 'Ready';
+    },
+    askFor: (c) => {
+      if (!c.anchorText) return 'Add when this was — then it counts.';
+      const piece = (c.missingPiece || '').split(/[—?]/)[0].trim();
+      return piece ? `Add ${piece} — then it counts.` : 'Add the missing piece — then it counts.';
+    },
+    // The thin flag's long nudge is replaced by the state chip + ask.
+    visibleFlags: (c) => (c.flags || []).filter((f) => f !== 'insufficient detail — draft'),
     checkerName: (id) => {
       const routes = app.get('card.nomination.routes') || [];
       const hit = routes.find((r) => String(r.reviewerId) === String(id));
@@ -225,6 +243,10 @@ const app = new Ractive({
 
   toggleThread(ci) {
     this.toggle(`card.claims.${ci}.threadOpen`);
+  },
+
+  toggleExpand(ci) {
+    this.toggle(`card.claims.${ci}.expanded`);
   },
 
   toggleLeftOut(ci) {
@@ -536,6 +558,16 @@ async function loadCapture(cardId) {
       for (const s of c.lineSignals) placed.add(s.signal);
     }
     const signalsElsewhere = liveSignals.filter((s) => !placed.has(s.signal));
+    // Option 1 + trust refinement (JP, Aug 6): lines that need you open
+    // pre-expanded and sort first; ready lines collapse to name + state
+    // + quote, their reasoning one tap away.
+    for (const c of card.claims || []) {
+      c.needsYou = !c.verdict && (c.aside || c.needsRelook || (c.lineSignals || []).length > 0);
+      c.expanded = c.needsYou;
+    }
+    if (isDocScreen && card.status === 'structured') {
+      card.claims.sort((a, b) => Number(b.needsYou) - Number(a.needsYou));
+    }
     const candidates = isDocScreen ? await api('GET', '/api/nominee-candidates').catch(() => []) : [];
     const boltInsView = (track.boltIns || []).map((name) => ({
       name,

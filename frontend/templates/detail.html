@@ -18,9 +18,9 @@
 
   {{#if isDocScreen && card.status === 'structured'}}
     <div class="banner banner-info">
-      We wrote {{card.claims.length}} line{{card.claims.length === 1 ? '' : 's'}} from your words.
-      {{docReady}} ready to send{{#if docAside}} · {{docAside}} set aside — not backed yet{{/if}}{{#if docLeftOut}} · {{docLeftOut}} left out by you{{/if}}.
-      Read it once. Open a line if something's off. One button sends it.
+      {{card.claims.length}} line{{card.claims.length === 1 ? '' : 's'}} from your words.
+      {{docReady}} ready{{#if docAside}} · {{docAside}} need{{docAside === 1 ? 's' : ''}} one thing{{/if}}{{#if docLeftOut}} · {{docLeftOut}} left out{{/if}}.
+      Start at the top. One button sends the ready ones.
     </div>
   {{/if}}
   {{#if isDocScreen && (card.status === 'structured' || needsResend)}}
@@ -92,40 +92,54 @@
       <div class="section-label">Your lines <span class="count">{{card.claims.length}}</span></div>
       {{#each card.claims: ci}}
         <article class="record">
-          <div class="record-head">
+          <div class="record-head" {{#if collapsible(this)}}on-click="@this.toggleExpand(ci)" style="cursor: pointer;"{{/if}}>
+            {{#if collapsible(this)}}<span class="meta">{{.expanded ? '▾' : '▸'}}</span>{{/if}}
             <span class="record-subject">{{.competencyOrDomain}}</span>
             {{#if isDocScreen && !.verdict}}
-              {{#if .aside}}
-                <span class="tag" style="color: var(--amber-ink);">not backed yet — stays out</span>
-              {{elseif .leftOut}}
-                <span class="tag">left out by you</span>
-              {{elseif .needsRelook}}
-                <span class="tag" style="color: var(--amber-ink);">JP tightened this — read it again</span>
-              {{else}}
-                <span class="meta" style="color: var(--stamp-green);">ready</span>
-              {{/if}}
+              <span class="tag" style="color: {{lineState(this) === 'Ready' ? 'var(--stamp-green)' : 'var(--amber-ink)'}};">{{lineState(this)}}</span>
             {{/if}}
             {{#if .verdict}}<span class="stamp {{.verdict === 'Confirmed' ? 'stamp-confirmed' : 'stamp-adjust'}}" style="position: static; transform: none;">{{.verdict}}</span>{{/if}}
           </div>
-          <div class="record-meta">
+
+          {{#if collapsible(this) && !.expanded}}
+            <p class="verbatim" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0.3rem 0 0;">“{{.sourceQuote}}”</p>
+          {{else}}
+
+          <p class="muted" style="font-size: var(--text-xs); margin: 0.3rem 0 0.1rem;">{{#if isReviewScreen}}Because they said:{{else}}Because you said:{{/if}}</p>
+          <p class="verbatim">“{{.sourceQuote}}”</p>
+
+          {{#if isDocScreen && card.status === 'structured' && .aside && !openContention(this)}}
+            <p style="font-size: var(--text-sm); color: var(--amber-ink); margin: 0.4rem 0 0.2rem;">{{askFor(this)}}</p>
+            {{#if !.threadOpen}}
+              <div class="sweep-actions">
+                <button class="btn btn-primary" on-click="@this.toggleThread(ci)">Add what's missing</button>
+              </div>
+            {{/if}}
+          {{/if}}
+
+          {{#if isDocScreen && card.status === 'structured'}}
+            {{#each .lineSignals}}
+              <div class="context-strip" style="margin-top: 0.5rem;">
+                <p style="font-size: var(--text-sm); margin: 0 0 0.2rem;"><strong>Also yours?</strong> {{.signal}}</p>
+                <p class="verbatim" style="margin: 0.2rem 0; font-size: var(--text-sm);">“{{.sourceQuote}}”</p>
+                <div class="sweep-actions" style="margin-top: 0.3rem;">
+                  <button class="btn btn-secondary" on-click="@this.claimSignalOnLine(ci, this)">Yes — add it to this line</button>
+                  <button class="btn btn-quiet" on-click="@this.skipSignal(this)">No</button>
+                </div>
+              </div>
+            {{/each}}
+          {{/if}}
+
+          <div class="record-meta" style="margin-top: 0.5rem;">
             {{#each .labels:field}}<span class="tag">{{field}}: {{this}}</span>{{/each}}
             {{#if .countAfterMe !== null}}<span>{{.countAfterMe}} after me</span>{{/if}}
             {{#if isDocScreen && card.nomination.routes && card.nomination.routes.length > 1 && .checkerId}}
               <span class="tag">goes to {{checkerName(.checkerId)}}</span>
             {{/if}}
           </div>
-          {{#if .flags.length}}
-            <div style="margin-top: 0.4rem;">
-              {{#each .flags}}
-                <p class="muted" style="font-size: var(--text-sm); color: var(--amber-ink);">{{flagNudge(this)}}</p>
-              {{/each}}
-            </div>
-          {{/if}}
-          <p class="muted" style="font-size: var(--text-xs); margin-bottom: 0.1rem;">{{#if isReviewScreen}}Because they said:{{else}}Because you said:{{/if}}</p>
-          <p class="verbatim">“{{.sourceQuote}}”</p>
           {{#if .rationale}}
             <p class="muted" style="font-size: var(--text-sm); margin-top: 0.3rem;">
-              <span class="tag">how we read it</span> {{.rationale}}
+              <span class="tag">why it reads this way</span> {{.rationale}}
               {{#if !isReviewScreen}}
                 <button class="linkish" on-click="@this.toggleContext(ci)" style="font-size: var(--text-xs);">{{.showContext ? 'hide the conversation' : 'see it in the conversation'}}</button>
               {{/if}}
@@ -143,12 +157,14 @@
           {{#if .anchorText}}
             <p class="muted" style="font-size: var(--text-sm);"><span class="tag">when &amp; where</span> {{.anchorText}}</p>
           {{/if}}
-          {{#if .missingPiece && isDocScreen && .aside}}
-            <p class="muted" style="font-size: var(--text-sm); color: var(--amber-ink);">
-              <strong>What's missing:</strong> {{.missingPiece}} — talk it out below and it can count.
-            </p>
-          {{/if}}
           {{#if .involvement}}<p class="muted" style="font-size: var(--text-sm);">{{.involvement}}</p>{{/if}}
+          {{#if visibleFlags(this).length}}
+            <div style="margin-top: 0.4rem;">
+              {{#each visibleFlags(this)}}
+                <p class="muted" style="font-size: var(--text-sm); color: var(--amber-ink);">{{flagNudge(this)}}</p>
+              {{/each}}
+            </div>
+          {{/if}}
           {{#each .contentions}}
             {{#if .outcome === null}}
               <div class="banner banner-info" style="margin: 0.6rem 0 0;">Being re-checked against your words — the answer lands here in about a minute.</div>
@@ -160,20 +176,8 @@
           {{/each}}
           {{#if .needsRelook && isDocScreen}}
             <div class="banner banner-warn" style="margin: 0.6rem 0 0;">
-              JP tightened this line after you sent it. Read it again — if it's right, send the card again and it rides along. If not, talk it out.
+              JP changed this line. Read it again — if it's right, send the card again and it rides along. If not, talk it out.
             </div>
-          {{/if}}
-          {{#if isDocScreen && card.status === 'structured'}}
-            {{#each .lineSignals}}
-              <div class="context-strip" style="margin-top: 0.6rem;">
-                <p style="font-size: var(--text-sm); margin: 0 0 0.2rem;"><span class="tag">we also noticed</span> {{.signal}}</p>
-                <p class="verbatim" style="margin: 0.2rem 0;">“{{.sourceQuote}}”</p>
-                <div class="sweep-actions" style="margin-top: 0.3rem;">
-                  <button class="btn btn-secondary" on-click="@this.claimSignalOnLine(ci, this)">Yes, that's mine — add it to this line</button>
-                  <button class="btn btn-quiet" on-click="@this.skipSignal(this)">Not mine — skip</button>
-                </div>
-              </div>
-            {{/each}}
           {{/if}}
           {{#if .verdictNote}}
             <div class="banner {{.verdict === 'Confirmed' ? 'banner-safe' : 'banner-warn'}}" style="margin: 0.6rem 0 0;">
@@ -193,8 +197,8 @@
 
           {{#if isDocScreen && card.status === 'structured' && !openContention(this)}}
             <div class="sweep-actions" style="margin-top: 0.5rem; flex-wrap: wrap;">
-              <button class="btn btn-secondary" on-click="@this.toggleThread(ci)">{{.threadOpen ? 'Close the thread' : (.aside ? 'Back it up — talk it out' : 'Not quite — talk it out')}}</button>
               {{#if !.aside}}
+                <button class="btn btn-quiet" on-click="@this.toggleThread(ci)">{{.threadOpen ? 'Close the thread' : "Something's off — talk it out"}}</button>
                 <button class="btn btn-quiet" on-click="@this.toggleLeftOut(ci)">{{.leftOut ? 'Put it back in' : 'Leave this one out'}}</button>
                 <select value="{{.overridePick}}" style="max-width: 16rem;">
                   <option value="">same person as the card</option>
@@ -202,6 +206,8 @@
                     <option value="{{._id}}">a different person saw this: {{.name}}</option>
                   {{/each}}
                 </select>
+              {{elseif .threadOpen}}
+                <button class="btn btn-quiet" on-click="@this.toggleThread(ci)">Close the thread</button>
               {{/if}}
               <button class="btn btn-danger" on-click="@this.removeClaim(this)">Not mine — remove</button>
             </div>
@@ -270,6 +276,8 @@
               <button class="btn btn-danger" on-click="@this.sendVerdict(this, 'Adjust')">Send back (Adjust)</button>
             </div>
           {{/if}}
+
+          {{/if}}
         </article>
       {{/each}}
     </section>
@@ -294,16 +302,18 @@
         {{/each}}
       {{/if}}
       {{#if boltInsView.length}}
-        <p class="muted" style="font-size: var(--text-sm); margin: 0.5rem 0;">
-          The full add-on list for your track. Nothing here is expected — claim only what is truly yours. Tap one and tell it in a few words.
-        </p>
-        <div class="sweep-actions" style="flex-wrap: wrap;">
-          {{#each boltInsView}}
-            <button class="btn {{.claimed || .open ? 'btn-quiet' : 'btn-secondary'}}" on-click="@this.startBoltIn(this)" disabled="{{.claimed || .open}}">
-              {{.name}}{{#if .claimed}} ✓ claimed{{elseif .open}} · open below{{/if}}
-            </button>
-          {{/each}}
-        </div>
+        <button class="linkish" on-click="@this.toggle('moreOpen')" style="margin-top: 0.5rem;">
+          {{moreOpen ? '▾' : '▸'}} The full add-on list ({{boltInsView.length}}) — claim only what is truly yours
+        </button>
+        {{#if moreOpen}}
+          <div class="sweep-actions" style="flex-wrap: wrap; margin-top: 0.5rem;">
+            {{#each boltInsView}}
+              <button class="btn {{.claimed || .open ? 'btn-quiet' : 'btn-secondary'}}" on-click="@this.startBoltIn(this)" disabled="{{.claimed || .open}}">
+                {{.name}}{{#if .claimed}} ✓ claimed{{elseif .open}} · open below{{/if}}
+              </button>
+            {{/each}}
+          </div>
+        {{/if}}
       {{/if}}
     </section>
   {{/if}}
