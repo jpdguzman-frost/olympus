@@ -120,6 +120,29 @@ describe('the one send (C2v2)', () => {
   });
 });
 
+describe('bolt-in thread dismiss (JP, Aug 6: toggle it off)', () => {
+  it('an open add-on thread closes cleanly; said words stay on record', async () => {
+    const card = await docCard('Dismiss Bolt-In');
+    const stored = await Card.findById(card._id);
+    stored.boltInThreads.push({
+      competency: 'Team onboarding',
+      thread: [
+        { role: 'ai', text: 'What did you do?' },
+        { role: 'talent', text: 'Actually never mind.' },
+      ],
+      status: 'open',
+    });
+    await stored.save();
+    const threadId = stored.boltInThreads[0]._id.toString();
+
+    const res = await agents.talentA.post(`/api/cards/${card._id}/bolt-in`).send({ threadId, dismiss: true });
+    expect(res.status).toBe(200);
+    const after = await Card.findById(card._id);
+    expect(after.boltInThreads).toHaveLength(0); // toggled off, no residue
+    expect(after.audit.some((a) => a.action === 'bolt-in-thread-dismissed')).toBe(true);
+  });
+});
+
 describe('per-line checker fan-out (one non-advocate per line)', () => {
   let card;
   let lineA;

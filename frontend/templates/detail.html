@@ -271,8 +271,8 @@
       </p>
       <div class="sweep-actions" style="flex-wrap: wrap;">
         {{#each boltInsView}}
-          <button class="btn {{.claimed ? 'btn-quiet' : 'btn-secondary'}}" on-click="@this.startBoltIn(this)" disabled="{{.claimed}}">
-            {{.name}}{{#if .claimed}} ✓ claimed{{/if}}
+          <button class="btn {{.claimed || .open ? 'btn-quiet' : 'btn-secondary'}}" on-click="@this.startBoltIn(this)" disabled="{{.claimed || .open}}">
+            {{.name}}{{#if .claimed}} ✓ claimed{{elseif .open}} · open below{{/if}}
           </button>
         {{/each}}
       </div>
@@ -295,7 +295,10 @@
           {{elseif .status === 'done'}}
             <div class="banner banner-safe" style="margin-top: 0.4rem;">{{.response}}</div>
           {{elseif .status === 'nothing'}}
-            <div class="banner banner-warn" style="margin-top: 0.4rem;">{{.response}} <button class="linkish" on-click="@this.boltInReopen(this)">Add more</button></div>
+            <div class="banner banner-warn" style="margin-top: 0.4rem;">{{.response}}
+              <button class="linkish" on-click="@this.boltInReopen(this)">Add more</button>
+              <button class="linkish" on-click="@this.boltInDismiss(this)">Never mind — close this</button>
+            </div>
           {{else}}
             <textarea value="{{.input}}" placeholder="In your own words — what, where, since when" style="min-height: 4rem;"></textarea>
             <div class="sweep-actions">
@@ -303,6 +306,8 @@
               {{#if hasThreadWords(this)}}
                 <button class="btn btn-secondary" on-click="@this.boltInClose(this)">That's it — write it up</button>
               {{/if}}
+              <span class="spacer"></span>
+              <button class="btn btn-quiet" on-click="@this.boltInDismiss(this)">Never mind — close this</button>
             </div>
           {{/if}}
         </div>

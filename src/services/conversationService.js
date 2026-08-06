@@ -370,13 +370,28 @@ export async function lineThread(actor, cardId, claimId, { text = null, close = 
  * drafts the line through the same wall as everything else. Talent
  * words persist verbatim first (Invariant 15).
  */
-export async function boltInThread(actor, cardId, { threadId = null, competency = null, signal = null, text = null, close = false, client = null } = {}) {
+export async function boltInThread(actor, cardId, { threadId = null, competency = null, signal = null, text = null, close = false, dismiss = false, client = null } = {}) {
   const card = await Card.findById(cardId);
   if (!card) throw notFound('Card not found');
   if (!card.talentId.equals(actor._id)) throw forbidden('Only the card\'s talent can talk on their card');
   if (!actor.hasRole('talent')) throw forbidden('Talent role required');
   if (card.status !== 'structured') {
     throw conflict(`Add-ons are claimed while you check the write-up (status "${card.status}")`);
+  }
+
+  // JP (Aug 6): opened one and changed your mind → close it, no residue.
+  // Anything already said stays in rawAnswers (Invariant 15) — only the
+  // thread goes. No AI call on this path.
+  if (dismiss) {
+    const thread = threadId ? card.boltInThreads.id(threadId) : null;
+    if (!thread) throw notFound('Thread not found');
+    if (thread.status === 'structuring') {
+      throw conflict('This one is already being written up — it lands on your card in about a minute');
+    }
+    pushCardAudit(card, { by: actor._id, action: 'bolt-in-thread-dismissed', note: thread.competency ?? thread.fromSignal });
+    card.boltInThreads.pull(threadId);
+    await card.save();
+    return { card, thread: null, turn: null };
   }
 
   const track = await Track.findOne({ key: card.track });

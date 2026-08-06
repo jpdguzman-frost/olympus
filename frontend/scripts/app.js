@@ -308,6 +308,17 @@ const app = new Ractive({
     if (idx >= 0) this.set(`card.boltInThreads.${idx}.status`, 'open');
   },
 
+  // JP (Aug 6): opened one, changed your mind — toggle it off.
+  async boltInDismiss(thread) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/bolt-in`, { threadId: thread._id, dismiss: true });
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
   // THE one send: reading was the review; this is the approval.
   async sendCard() {
     this.set({ notice: null, actionError: null });
@@ -500,9 +511,10 @@ async function loadCapture(cardId) {
     const candidates = isDocScreen ? await api('GET', '/api/nominee-candidates').catch(() => []) : [];
     const boltInsView = (track.boltIns || []).map((name) => ({
       name,
-      claimed:
-        (card.claims || []).some((c) => c.competencyOrDomain === name) ||
-        (card.boltInThreads || []).some((t) => t.competency === name && ['open', 'structuring'].includes(t.status)),
+      // claimed = an actual line exists; open = a thread is in progress
+      // below (dismissable — JP, Aug 6). Never conflate the two.
+      claimed: (card.claims || []).some((c) => c.competencyOrDomain === name),
+      open: (card.boltInThreads || []).some((t) => t.competency === name && ['open', 'structuring'].includes(t.status)),
     }));
     app.set({
       view: 'detail',
