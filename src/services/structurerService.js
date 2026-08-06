@@ -144,16 +144,19 @@ export function buildOutputSchema(track) {
         items: { type: 'string' },
       },
       // A4: upward signals present in the words but not claimed —
-      // recorded with their verbatim quote, never as a claim.
+      // recorded with their verbatim quote, never as a claim. Every
+      // signal POINTS AT a competency from the list (JP, Aug 6):
+      // nothing floats.
       signalsNoted: {
         type: 'array',
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['signal', 'sourceQuote'],
+          required: ['signal', 'sourceQuote', 'competencyOrDomain'],
           properties: {
             signal: { type: 'string' },
             sourceQuote: { type: 'string' },
+            competencyOrDomain: { type: 'string', enum: track.competencyOrDomainList },
           },
         },
       },
@@ -243,7 +246,8 @@ function renderCardInput(card, capsScaffold = null, { minimal = false } = {}) {
     '- missingPiece: when (and only when) you flag a line "insufficient detail — draft", say exactly',
     '  what one piece is missing, plainly ("a when — roughly when did this happen?", "where this was").',
     '  Empty string on every other line.',
-    '- Note upward signals they did not claim (signalsNoted), each with its exact verbatim quote.',
+    '- Note upward signals they did not claim (signalsNoted), each with its exact verbatim quote AND',
+    '  the competency it points at (from the list) — a signal that points at nothing is dropped.',
     '- followUps: the anchor/clarifier questions you would ask, within your question budget — they will be relayed to the talent.',
     'Output only the schema. Never a level, never a score.',
     'NEVER output a placeholder row: a claim with empty labels or an empty sourceQuote is forbidden.',
@@ -407,6 +411,7 @@ export function validateStructuredOutput(track, card, output) {
 
   // A4 signals noted, not claimed: same anti-fabrication bar as claims —
   // the quote must be the talent's verbatim words or the signal drops.
+  // JP (Aug 6): a signal must also point at a competency, or it drops.
   const signalsNoted = [];
   for (const raw of Array.isArray(output.signalsNoted) ? output.signalsNoted : []) {
     const quote = normalize(raw.sourceQuote);
@@ -414,7 +419,16 @@ export function validateStructuredOutput(track, card, output) {
       rejected.push({ claim: raw, reason: 'Signal quote is missing or does not appear in the raw answers' });
       continue;
     }
-    signalsNoted.push({ signal: raw.signal.trim(), sourceQuote: raw.sourceQuote, at: new Date() });
+    if (!track.competencyOrDomainList.includes(raw.competencyOrDomain)) {
+      rejected.push({ claim: raw, reason: `Signal points at no competency on the list ("${raw.competencyOrDomain ?? ''}")` });
+      continue;
+    }
+    signalsNoted.push({
+      signal: raw.signal.trim(),
+      sourceQuote: raw.sourceQuote,
+      competencyOrDomain: raw.competencyOrDomain,
+      at: new Date(),
+    });
   }
 
   // A3 question budget (supersedes FR-9's per-card cap): 1 anchor + max

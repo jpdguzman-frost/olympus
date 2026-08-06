@@ -190,6 +190,18 @@ router.post('/api/cards/:id/claims/:claimId/thread', async (req, res, next) => {
   }
 });
 
+// --- JP (Aug 6): "not mine" on a noticed item — hidden from the talent,
+// never erased; checker and Endorsement Review keep it with the answer.
+router.post('/api/cards/:id/signals/decide', async (req, res, next) => {
+  try {
+    const { decideSignal } = await import('../services/conversationService.js');
+    const card = await decideSignal(req.currentUser, req.params.id, req.body ?? {});
+    sendSuccess(res, cards.presentCard(req.currentUser, card));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- C2v2: bolt-in / signal threads — the full list is shown; a small
 // contextual chat gathers enough, the worker drafts the line.
 router.post('/api/cards/:id/bolt-in', async (req, res, next) => {

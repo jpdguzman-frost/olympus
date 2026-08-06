@@ -61,6 +61,7 @@ const app = new Ractive({
     sendSummary: '',
     needsResend: false,
     boltInsView: [],
+    signalsElsewhere: [],
     vocabFields: [],
     approvedCount: 0,
     nominating: false,
@@ -274,6 +275,33 @@ const app = new Ractive({
     this.set({ notice: null, actionError: null });
     try {
       await api('POST', `/api/cards/${this.get('card._id')}/bolt-in`, { signal: sig.signal });
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  // JP (Aug 6): a noticed item on a line — claiming opens THAT line's
+  // thread, seeded with the signal; skipping hides it, answer on record.
+  async claimSignalOnLine(ci, sig) {
+    this.set({ notice: null, actionError: null });
+    const claim = this.get(`card.claims.${ci}`);
+    try {
+      const result = await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/thread`, {
+        signal: sig.signal,
+      });
+      this.set(`card.claims.${ci}.thread`, result.thread);
+      this.set(`card.claims.${ci}.threadOpen`, true);
+      this.set(`card.claims.${ci}.lineSignals`, (claim.lineSignals || []).filter((s) => s.signal !== sig.signal));
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  async skipSignal(sig) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/signals/decide`, { signal: sig.signal, action: 'not-mine' });
       await this.refreshDetail();
     } catch (err) {
       this.set('actionError', err.message);
@@ -496,6 +524,18 @@ async function loadCapture(cardId) {
       c.threadInput = '';
       c.showContext = false;
     }
+    // JP (Aug 6): every noticed item points at a competency. It renders
+    // ON that competency's line; leftovers (no line yet, or legacy
+    // unmapped) go under "More you can claim".
+    const liveSignals = (card.signalsNoted || []).filter((s) => !s.talentSaid);
+    const placed = new Set();
+    for (const c of card.claims || []) {
+      c.lineSignals = liveSignals.filter(
+        (s) => s.competencyOrDomain === c.competencyOrDomain && !placed.has(s.signal),
+      );
+      for (const s of c.lineSignals) placed.add(s.signal);
+    }
+    const signalsElsewhere = liveSignals.filter((s) => !placed.has(s.signal));
     const candidates = isDocScreen ? await api('GET', '/api/nominee-candidates').catch(() => []) : [];
     const boltInsView = (track.boltIns || []).map((name) => ({
       name,
@@ -521,6 +561,7 @@ async function loadCapture(cardId) {
       candidates,
       checkerPick: String(card.nomination?.routes?.[0]?.reviewerId ?? ''),
       boltInsView,
+      signalsElsewhere,
       needsResend:
         isDocScreen &&
         card.status !== 'structured' &&

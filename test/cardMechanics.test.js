@@ -294,12 +294,16 @@ describe('A4 signals noted, not claimed', () => {
       claims: [],
       followUps: [],
       signalsNoted: [
-        { signal: 'Ran the leads sync — possible leadership signal, not claimed', sourceQuote: 'I also ran the weekly leads sync' },
-        { signal: 'Invented signal', sourceQuote: 'I managed the entire department' },
+        // JP (Aug 6): every signal must point at a competency on the list
+        { signal: 'Ran the leads sync — possible leadership signal, not claimed', sourceQuote: 'I also ran the weekly leads sync', competencyOrDomain: 'build-ops' },
+        { signal: 'Invented signal', sourceQuote: 'I managed the entire department', competencyOrDomain: 'build-ops' },
+        { signal: 'Floating signal with no competency', sourceQuote: 'I also ran the weekly leads sync' },
       ],
     });
     expect(signalsNoted).toHaveLength(1);
+    expect(signalsNoted[0].competencyOrDomain).toBe('build-ops');
     expect(rejected.some((r) => r.reason.match(/Signal quote/))).toBe(true);
+    expect(rejected.some((r) => r.reason.match(/points at no competency/))).toBe(true);
   });
 
   it('signals show to the talent right away (no hold — JP spot-checks) and the admin resurface list sees them (C9 hook)', async () => {

@@ -93,6 +93,12 @@ export function presentCard(actor, card) {
       obj.claims = obj.claims.filter((c) => (c.checkerId ? c.checkerId.toString() === actorId : true));
     }
   }
+  // JP (Aug 6): a noticed item the talent answered "not mine" hides
+  // from THEIR view (skip means skip) — everyone with standing to read
+  // it (checker, admin) still sees it, with the answer on record.
+  if (isOwn && Array.isArray(obj.signalsNoted)) {
+    obj.signalsNoted = obj.signalsNoted.filter((s) => s.talentSaid !== 'not-mine');
+  }
   // BR-4: filed 60+ days after close carries STALE — context, never a block.
   if (obj.filedDate && obj.closeDate && new Date(obj.filedDate) - new Date(obj.closeDate) > STALE_MS) {
     obj.stale = true;

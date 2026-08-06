@@ -29,7 +29,7 @@ import { User } from '../models/User.js';
 import { composeSystemPrompt, trackReadyForStructuring } from './structurerService.js';
 import { taskScaffold } from './capsService.js';
 import { badRequest, forbidden, notFound, conflict } from '../utils/httpError.js';
-import { pushCardAudit } from './auditService.js';
+import { pushCardAudit, recordAudit } from './auditService.js';
 
 // JP (Aug 5): the interaction runs on Sonnet 5; structuring stays on Opus.
 const MODEL = process.env.CONVERSATION_MODEL || 'claude-sonnet-5';
@@ -275,7 +275,7 @@ async function threadAiTurn(track, client, { frameLines, thread, readyKey }) {
  * opens a contention — the existing re-map loop answers it within a
  * minute, and a mapping is never final over the talent's objection.
  */
-export async function lineThread(actor, cardId, claimId, { text = null, close = false, client = null } = {}) {
+export async function lineThread(actor, cardId, claimId, { text = null, close = false, signal = null, client = null } = {}) {
   const card = await Card.findById(cardId);
   if (!card) throw notFound('Card not found');
   if (!card.talentId.equals(actor._id)) throw forbidden('Only the card\'s talent can talk on their card');
@@ -292,6 +292,20 @@ export async function lineThread(actor, cardId, claimId, { text = null, close = 
   const track = await Track.findOne({ key: card.track });
   if (!track || !trackReadyForStructuring(track)) {
     throw conflict('The assistant is not ready on this track yet — ask JP');
+  }
+
+  // JP (Aug 6): a noticed signal on this line — claiming it opens the
+  // thread WITH the signal as the seed, no AI call needed. The talent
+  // answers in their own words; the re-check reads everything.
+  if (signal?.trim() && !text?.trim()) {
+    const sig = card.signalsNoted.find((s) => s.signal === signal.trim() && s.talentSaid !== 'not-mine');
+    if (!sig) throw notFound('That noticed item is no longer here');
+    sig.talentSaid = 'claimed';
+    const seed = `You said "${sig.sourceQuote}" — that sounds like: ${sig.signal}. Say a bit more in your own words and this line gets re-checked with it.`;
+    claim.thread.push({ role: 'ai', text: seed });
+    pushCardAudit(card, { by: actor._id, action: 'signal-claim-opened', note: sig.signal });
+    await card.save();
+    return { card, claim, turn: { message: seed, ready: false } };
   }
 
   if (text?.trim()) {
@@ -364,6 +378,29 @@ export async function lineThread(actor, cardId, claimId, { text = null, close = 
 }
 
 /**
+ * JP (Aug 6): the talent says a noticed signal is NOT theirs. It hides
+ * from their view — but is never erased: the checker and Endorsement
+ * Review still see it, with the answer on record.
+ */
+export async function decideSignal(actor, cardId, { signal = null, action = null } = {}) {
+  const card = await Card.findById(cardId);
+  if (!card) throw notFound('Card not found');
+  if (!card.talentId.equals(actor._id)) throw forbidden('Only the card\'s talent can answer this');
+  if (!actor.hasRole('talent')) throw forbidden('Talent role required');
+  if (card.status !== 'structured') {
+    throw conflict(`Noticed items are answered while you check the write-up (status "${card.status}")`);
+  }
+  if (action !== 'not-mine') throw badRequest('The only answer here is not-mine — claiming opens a thread instead');
+  const sig = card.signalsNoted.find((s) => s.signal === String(signal ?? '').trim());
+  if (!sig) throw notFound('That noticed item is no longer here');
+  sig.talentSaid = 'not-mine';
+  pushCardAudit(card, { by: actor._id, action: 'signal-not-mine', note: sig.signal });
+  await card.save();
+  await recordAudit({ actorId: actor._id, action: 'card.signal-not-mine', entity: 'card', entityId: card._id, after: { signal: sig.signal } });
+  return card;
+}
+
+/**
  * Bolt-in / signal threads: the talent taps an add-on from the FULL
  * bolt-in list (JP: "they can't claim what they can't see") or claims a
  * noted signal; a small contextual chat gathers enough, then the worker
@@ -414,6 +451,11 @@ export async function boltInThread(actor, cardId, { threadId = null, competency 
       card.boltInThreads.find(
         (t) => t.status === 'open' && ((competency && t.competency === competency) || (signal && t.fromSignal === signal)),
       ) ?? card.boltInThreads[card.boltInThreads.push({ competency: competency ?? null, fromSignal: signal?.trim() || null, thread: [], status: 'open' }) - 1];
+    // Claiming a noticed signal: the answer goes on record right away.
+    if (signal?.trim()) {
+      const sig = card.signalsNoted.find((s) => s.signal === signal.trim());
+      if (sig) sig.talentSaid = 'claimed';
+    }
   }
 
   if (text?.trim()) {

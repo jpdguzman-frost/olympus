@@ -163,6 +163,18 @@
               JP tightened this line after you sent it. Read it again — if it's right, send the card again and it rides along. If not, talk it out.
             </div>
           {{/if}}
+          {{#if isDocScreen && card.status === 'structured'}}
+            {{#each .lineSignals}}
+              <div class="context-strip" style="margin-top: 0.6rem;">
+                <p style="font-size: var(--text-sm); margin: 0 0 0.2rem;"><span class="tag">we also noticed</span> {{.signal}}</p>
+                <p class="verbatim" style="margin: 0.2rem 0;">“{{.sourceQuote}}”</p>
+                <div class="sweep-actions" style="margin-top: 0.3rem;">
+                  <button class="btn btn-secondary" on-click="@this.claimSignalOnLine(ci, this)">Yes, that's mine — add it to this line</button>
+                  <button class="btn btn-quiet" on-click="@this.skipSignal(this)">Not mine — skip</button>
+                </div>
+              </div>
+            {{/each}}
+          {{/if}}
           {{#if .verdictNote}}
             <div class="banner {{.verdict === 'Confirmed' ? 'banner-safe' : 'banner-warn'}}" style="margin: 0.6rem 0 0;">
               {{#if .verdict === 'Confirmed'}}Checked by your reviewer: {{else}}Reviewer's note: {{/if}}{{.verdictNote}}
@@ -263,19 +275,36 @@
     </section>
   {{/if}}
 
-  {{#if isDocScreen && card.status === 'structured' && boltInsView.length}}
+  {{#if isDocScreen && card.status === 'structured' && (boltInsView.length || signalsElsewhere.length)}}
     <section>
       <div class="section-label">More you can claim</div>
-      <p class="muted" style="font-size: var(--text-sm); margin-bottom: 0.5rem;">
-        The full add-on list for your track. Nothing here is expected — claim only what is truly yours. Tap one and tell it in a few words.
-      </p>
-      <div class="sweep-actions" style="flex-wrap: wrap;">
-        {{#each boltInsView}}
-          <button class="btn {{.claimed || .open ? 'btn-quiet' : 'btn-secondary'}}" on-click="@this.startBoltIn(this)" disabled="{{.claimed || .open}}">
-            {{.name}}{{#if .claimed}} ✓ claimed{{elseif .open}} · open below{{/if}}
-          </button>
+      {{#if signalsElsewhere.length}}
+        <p class="muted" style="font-size: var(--text-sm); margin-bottom: 0.5rem;">
+          From your own words — no line for these yet. Yours to claim, or skip.
+        </p>
+        {{#each signalsElsewhere}}
+          <div class="question-block">
+            <div class="question-text">{{#if .competencyOrDomain}}<span class="tag">{{.competencyOrDomain}}</span> {{/if}}{{.signal}}</div>
+            <p class="verbatim">“{{.sourceQuote}}”</p>
+            <div class="sweep-actions" style="margin-top: 0.3rem;">
+              <button class="btn btn-secondary" on-click="@this.startSignalClaim(this)">Yes, that's mine — tell it</button>
+              <button class="btn btn-quiet" on-click="@this.skipSignal(this)">Not mine — skip</button>
+            </div>
+          </div>
         {{/each}}
-      </div>
+      {{/if}}
+      {{#if boltInsView.length}}
+        <p class="muted" style="font-size: var(--text-sm); margin: 0.5rem 0;">
+          The full add-on list for your track. Nothing here is expected — claim only what is truly yours. Tap one and tell it in a few words.
+        </p>
+        <div class="sweep-actions" style="flex-wrap: wrap;">
+          {{#each boltInsView}}
+            <button class="btn {{.claimed || .open ? 'btn-quiet' : 'btn-secondary'}}" on-click="@this.startBoltIn(this)" disabled="{{.claimed || .open}}">
+              {{.name}}{{#if .claimed}} ✓ claimed{{elseif .open}} · open below{{/if}}
+            </button>
+          {{/each}}
+        </div>
+      {{/if}}
     </section>
   {{/if}}
 
@@ -315,21 +344,16 @@
     </section>
   {{/if}}
 
-  {{#if card.signalsNoted && card.signalsNoted.length}}
+  {{#if isReviewScreen && card.signalsNoted && card.signalsNoted.length}}
     <section>
-      <div class="section-label">We also noticed</div>
+      <div class="section-label">Also in their words, not claimed</div>
       {{#each card.signalsNoted}}
         <div class="question-block">
-          <div class="question-text">{{.signal}}</div>
+          <div class="question-text">{{#if .competencyOrDomain}}<span class="tag">{{.competencyOrDomain}}</span> {{/if}}{{.signal}}</div>
           <p class="verbatim">“{{.sourceQuote}}”</p>
           <p class="muted" style="font-size: var(--text-xs);">
-            {{#if isReviewScreen}}They chose not to claim this — you can still ask about it.{{else}}Noticed, not claimed. No pressure, nothing counts against you.{{/if}}
+            {{#if .talentSaid === 'not-mine'}}They said this is not theirs — that answer is on record.{{else}}They chose not to claim this — you can still ask about it.{{/if}}
           </p>
-          {{#if isDocScreen && card.status === 'structured'}}
-            <div class="sweep-actions" style="margin-top: 0.3rem;">
-              <button class="btn btn-secondary" on-click="@this.startSignalClaim(this)">This is mine — claim it</button>
-            </div>
-          {{/if}}
         </div>
       {{/each}}
     </section>

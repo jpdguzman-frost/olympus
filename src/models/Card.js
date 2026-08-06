@@ -240,10 +240,18 @@ const cardSchema = new Schema(
     // A4: "signal noted, not claimed" — upward signals the talent chose
     // not to claim. Recorded, visible to the reviewer, resurfaced at
     // Endorsement Review (C9 hook). Never a penalty.
+    // JP (Aug 6): every signal POINTS AT a competency — nothing floats.
+    // It renders on that competency's line (or under its name in the
+    // claim-more area) and claiming it feeds that same competency.
     signalsNoted: [
       {
         signal: { type: String, required: true },
         sourceQuote: { type: String, required: true }, // verbatim, validated
+        competencyOrDomain: { type: String, default: null }, // from the pack list; null only on legacy cards
+        // The talent's answer, on record: claimed it, or said not-mine
+        // (hidden from their view then — but never erased; the checker
+        // and Endorsement Review still see it, with the answer).
+        talentSaid: { type: String, enum: ['claimed', 'not-mine', null], default: null },
         at: { type: Date, default: Date.now },
       },
     ],
