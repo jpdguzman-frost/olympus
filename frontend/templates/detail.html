@@ -335,21 +335,6 @@
     </section>
   {{/if}}
 
-  {{#if card.followUps.length && isDocScreen && card.status === 'structured'}}
-    <section>
-      <div class="section-label">Follow-ups</div>
-      {{#each card.followUps}}
-        <div class="sweep-panel">
-          <p style="margin-bottom: 0.5rem;">{{.question}}</p>
-          <textarea value="{{.answer}}" placeholder="In your own words — “not me” is fine"></textarea>
-          <div class="sweep-actions">
-            <button class="btn btn-secondary" on-click="@this.answerFollowUp(this)">Save answer</button>
-          </div>
-        </div>
-      {{/each}}
-    </section>
-  {{/if}}
-
   {{#if isDocScreen && card.status === 'structured'}}
     <div class="submit-bar" style="flex-wrap: wrap;">
       <span class="muted" style="font-size: var(--text-sm);">

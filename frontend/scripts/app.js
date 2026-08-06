@@ -405,18 +405,6 @@ const app = new Ractive({
     }
   },
 
-  async answerFollowUp(followUp) {
-    this.set({ notice: null, actionError: null });
-    try {
-      await api('POST', `/api/cards/${this.get('card._id')}/follow-ups/${followUp._id}/answer`, {
-        answer: followUp.answer,
-      });
-      this.set('notice', 'Answer saved.');
-    } catch (err) {
-      this.set('actionError', err.message);
-    }
-  },
-
   async submitThinPool() {
     this.set({ notice: null, actionError: null });
     try {
