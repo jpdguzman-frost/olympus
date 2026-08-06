@@ -127,6 +127,13 @@
                 <button class="btn btn-quiet" on-click="@this.set('card.claims.' + ci + '.editing', false)">Cancel</button>
               </div>
             {{else}}
+              {{#if .flags.indexOf('insufficient detail — draft') > -1}}
+                <div class="sweep-actions" style="flex-wrap: wrap;">
+                  <input type="text" value="{{.detailText}}" placeholder="The missing piece — when it was, where, or something a reviewer could check" style="flex: 2;" />
+                  <button class="btn btn-primary" on-click="@this.addDetail(this)">Add the detail</button>
+                  <button class="btn btn-danger" on-click="@this.removeClaim(this)">Not mine — remove</button>
+                </div>
+              {{else}}
               {{#if !.anchorText}}
                 <div class="sweep-actions" style="flex-wrap: wrap;">
                   <input type="text" value="{{.anchorInput}}" placeholder="This line needs a date — when was this, and where? e.g. JFC, April to June 2026" style="flex: 2;" />
@@ -138,6 +145,7 @@
                 <button class="btn btn-secondary" on-click="@this.startFix(this, ci)">Fix it</button>
                 <button class="btn btn-danger" on-click="@this.removeClaim(this)">Not mine — remove</button>
               </div>
+              {{/if}}
               <div class="sweep-actions" style="margin-top: 0.4rem;">
                 <input type="text" value="{{.contestText}}" placeholder="Or: that's not what my words mean — say what's wrong" style="flex: 2;" />
                 <button class="btn btn-quiet" on-click="@this.contestClaim(this)">Re-check this line</button>

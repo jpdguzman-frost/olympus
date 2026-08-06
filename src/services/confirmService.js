@@ -51,6 +51,40 @@ export async function decideClaim(actor, cardId, claimId, { action, labels, remo
     throw badRequest('You defended this claim — changing it now needs a stated reason, on the record');
   }
 
+  // JP's thin-line rule (Aug 6): a line flagged "insufficient detail —
+  // draft" cannot be approved, fixed-and-kept, or defended as-is. The
+  // talent adds the missing piece (their words, re-checked by the AI)
+  // or leaves it — it stays a draft and costs nothing.
+  const THIN_FLAG = 'insufficient detail — draft';
+  const isThin = (claim.flags || []).includes(THIN_FLAG);
+  if (isThin && (['approve', 'defend'].includes(action) || (action === 'fix' && !remove))) {
+    throw badRequest('This line is too thin to count yet — add the missing piece (when it was, where, or something a reviewer could check), or leave it as a draft. It costs you nothing either way.');
+  }
+
+  if (action === 'add-detail') {
+    const text = statement;
+    if (!text?.trim()) throw badRequest('Say the missing piece — when it was, where, or something a reviewer could check');
+    // Invariant 15: the talent's new words persist as raw answers — and
+    // become quotable — before the AI re-checks the line.
+    card.rawAnswers.push({
+      questionIndex: null,
+      question: `Added detail for: ${claim.competencyOrDomain}`,
+      answer: text.trim(),
+      at: new Date(),
+    });
+    if (card.captureMode === 'conversation') {
+      card.conversation.push({ role: 'talent', kind: 'answer', text: text.trim() });
+    }
+    const open = (claim.contentions || []).find((c) => c.outcome === null);
+    if (open) throw conflict('This line is already being re-checked — the answer lands here shortly');
+    claim.contentions.push({ text: `The talent added detail for this line: ${text.trim()}`, at: new Date(), outcome: null });
+    claim.talentApproved = false;
+    pushCardAudit(card, { by: actor._id, action: 'claim-detail-added', note: text.trim() });
+    await card.save();
+    await recordAudit({ actorId: actor._id, action: 'card.claim-detail-added', entity: 'card', entityId: card._id });
+    return card;
+  }
+
   // A4 date anchoring: nothing gets approved without account + date or
   // period. The talent adds it in their own words; the line is never
   // blocked, it just stays draft — "needs a date".
@@ -116,7 +150,7 @@ export async function decideClaim(actor, cardId, claimId, { action, labels, remo
       }
     }
   } else {
-    throw badRequest('action is approve, fix, defend, anchor, or contest');
+    throw badRequest('action is approve, fix, defend, anchor, contest, or add-detail');
   }
 
   pushCardAudit(card, {
@@ -152,9 +186,16 @@ export async function answerFollowUp(actor, cardId, followUpId, answer) {
 export async function approveCard(actor, cardId, { honestGap } = {}) {
   const card = await ownStructuredCard(actor, cardId);
   if (!card.claims.length) throw conflict('No claims to approve — nothing can route');
-  const unapproved = card.claims.filter((c) => !c.talentApproved);
-  if (unapproved.length) {
-    throw conflict(`${unapproved.length} claim(s) still need your approve or fix`);
+  // Invariant 5, made real: partial approval routes only approved
+  // claims. Thin drafts (JP's rule) don't block the card — they stay
+  // behind as drafts, invisible to the reviewer, costing nothing.
+  const THIN_FLAG = 'insufficient detail — draft';
+  const blocking = card.claims.filter((c) => !c.talentApproved && !(c.flags || []).includes(THIN_FLAG));
+  if (blocking.length) {
+    throw conflict(`${blocking.length} claim(s) still need your approve or fix`);
+  }
+  if (!card.claims.some((c) => c.talentApproved)) {
+    throw conflict('Every line is still a thin draft — add the missing details, or nothing can route yet');
   }
   if (typeof honestGap === 'string' && honestGap.trim()) card.honestGap = honestGap;
   await transition(card, 'talent-approved', actor._id, 'talent approved every claim');

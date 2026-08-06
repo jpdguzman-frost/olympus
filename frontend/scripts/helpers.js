@@ -57,7 +57,7 @@ const FLAG_NUDGES = {
   'Call not owned': 'The call was not yours here. Written down honestly. That is fine.',
   "did not make the call — doesn't lift level": 'You did the work. Someone else made the call. It still counts — it just does not raise your level.',
   'No disruption on record — not a gap': 'Nothing broke on your watch. That is fine. Not a gap.',
-  'insufficient detail — draft': 'Saved as draft. Add the missing detail any time. Nothing is lost.',
+  'insufficient detail — draft': 'This line is too thin to count yet. Add the missing piece — when it was, where, or something a reviewer could check — and it becomes claimable. Or leave it; it stays a draft and costs you nothing.',
   'signal noted, not claimed': 'We saw something you chose not to claim. It is noted. No pressure. Your reviewer may still ask.',
   'not yet reached — not a gap': 'Not part of your work yet. That is fine. Not a gap.',
   "designed, not held — doesn't lift level": 'You designed it, but the project did not run on it. Saved — it just does not raise your level.',

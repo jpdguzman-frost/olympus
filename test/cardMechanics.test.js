@@ -213,6 +213,76 @@ describe('A4 contention loop — never final over the talent\'s objection', () =
   });
 });
 
+describe("JP's thin-line rule (Aug 6): insufficient detail cannot count as-is", () => {
+  async function thinCard(name) {
+    const card = await structuredCard(name);
+    const stored = await Card.findById(card._id);
+    stored.claims[0].flags = ['insufficient detail — draft'];
+    await stored.save();
+    return stored;
+  }
+
+  it('a thin line cannot be approved, defended, or kept via fix — plain message, no penalty', async () => {
+    const card = await thinCard('Thin Line Card');
+    const claimId = card.claims[0]._id.toString();
+    const res = await agents.talentA.post(`/api/cards/${card._id}/claims/${claimId}/decide`).send({ action: 'approve' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/too thin to count/);
+  });
+
+  it('add-detail saves the words verbatim and sends the line for a re-check', async () => {
+    const card = await thinCard('Thin Detail Card');
+    const claimId = card.claims[0]._id.toString();
+    const res = await agents.talentA.post(`/api/cards/${card._id}/claims/${claimId}/decide`).send({
+      action: 'add-detail',
+      statement: 'This was on GCash, March to June 2026 — the board history shows it.',
+    });
+    expect(res.status).toBe(200);
+    const stored = await Card.findById(card._id);
+    expect(stored.rawAnswers.some((a) => a.answer.includes('March to June 2026'))).toBe(true); // quotable now
+    expect(stored.claims[0].contentions.some((c) => c.outcome === null)).toBe(true); // re-check queued
+  });
+
+  it('thin drafts never block the card: it routes with only the approved lines, and the reviewer never sees the draft', async () => {
+    const card = await structuredCard('Partial Route Card');
+    const stored = await Card.findById(card._id);
+    stored.claims.push({
+      type: 'claim', competencyOrDomain: 'build-ops', labels: {}, sourceQuote: 'I run it daily on GCash since April.',
+      anchorText: null, flags: ['insufficient detail — draft'],
+    });
+    stored.claims[0].talentApproved = true;
+    await stored.save();
+
+    const approved = await agents.talentA.post(`/api/cards/${card._id}/approve`);
+    expect(approved.status).toBe(200); // the thin draft did not block
+
+    // Route it and check reviewer visibility + verdict wall.
+    const { transition } = await import('../src/services/statusMachine.js');
+    const routed = await Card.findById(card._id);
+    routed.nomination.nominees = [{ userId: ctx.users.reviewer._id, name: 'R', role: 'confirmer' }];
+    await transition(routed, 'exposure-signoff', ctx.users.talentA._id);
+    await transition(routed, 'routed', ctx.users.talentA._id);
+    routed.nomination.routedTo = ctx.users.reviewer._id;
+    routed.nomination.routedAt = new Date();
+    await routed.save();
+
+    const reviewerAgent = await ctx.loginAs(ctx.users.reviewer);
+    const view = await reviewerAgent.get(`/api/cards/${card._id}`);
+    expect(view.body.data.claims).toHaveLength(1); // the draft is invisible (Invariant 5)
+
+    const thinId = routed.claims[1]._id.toString();
+    const verdictOnDraft = await reviewerAgent.post(`/api/cards/${card._id}/claims/${thinId}/verdict`)
+      .send({ verdict: 'Confirmed', note: 'x' });
+    expect(verdictOnDraft.status).toBe(409); // drafts take no verdict
+
+    const goodId = routed.claims[0]._id.toString();
+    const confirmed = await reviewerAgent.post(`/api/cards/${card._id}/claims/${goodId}/verdict`)
+      .send({ verdict: 'Confirmed', note: 'checked the board history' });
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body.data.status).toBe('confirmed'); // the leftover draft did not block confirmation
+  });
+});
+
 describe('A4 signals noted, not claimed', () => {
   it('a signal with a verbatim quote lands; a fabricated one drops', async () => {
     const track = await Track.findOne({ key: 'ops' });

@@ -84,7 +84,9 @@ export async function refuseAfterRuling(actor, cardId, statement) {
   });
 
   // The fallback reviews FRESH: contested verdicts clear (both final
-  // positions already live permanently in the audit trail).
+  // positions already live permanently in the audit trail). The cleared
+  // lines stay talent-approved — they were routed on the talent's
+  // approval, and the defence stands on the record.
   const cleared = [];
   for (const claim of card.claims) {
     if (claim.verdict !== null) {
@@ -93,6 +95,7 @@ export async function refuseAfterRuling(actor, cardId, statement) {
       claim.verdictNote = null;
       claim.verdictBy = null;
       claim.verdictAt = null;
+      claim.talentApproved = true;
     }
   }
   if (cleared.length) {

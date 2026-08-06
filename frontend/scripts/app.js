@@ -185,6 +185,21 @@ const app = new Ractive({
     await this.claimAction(claim, { action: 'anchor', statement: claim.anchorInput });
   },
 
+  // JP's thin-line rule: add the missing piece; the AI re-checks the line.
+  async addDetail(claim) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/claims/${claim._id}/decide`, {
+        action: 'add-detail',
+        statement: claim.detailText,
+      });
+      this.set('notice', 'Got it — your detail is saved and the line is being re-checked. The answer lands here in about a minute.');
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
   // A4: contest a line against its traceback — the AI re-checks it.
   async contestClaim(claim) {
     this.set({ notice: null, actionError: null });

@@ -73,6 +73,13 @@ const NUDGE_IDLE_MS = 83 * 24 * 60 * 60 * 1000;
 
 export function presentCard(actor, card) {
   const obj = typeof card.toObject === 'function' ? card.toObject() : card;
+  // Invariant 5: no claim reaches anyone but the talent (and admin)
+  // without the talent's per-claim approval — unapproved drafts are
+  // invisible to reviewers and every other reader.
+  const isOwn = obj.talentId?.toString?.() === actor._id?.toString?.();
+  if (!isOwn && !actor.hasRole('admin') && Array.isArray(obj.claims)) {
+    obj.claims = obj.claims.filter((c) => c.talentApproved || c.verdict);
+  }
   // BR-4: filed 60+ days after close carries STALE — context, never a block.
   if (obj.filedDate && obj.closeDate && new Date(obj.filedDate) - new Date(obj.closeDate) > STALE_MS) {
     obj.stale = true;
@@ -304,6 +311,9 @@ export async function applyVerdict(actor, cardId, claimId, { verdict, note = nul
 
   const claim = card.claims.id(claimId);
   if (!claim) throw notFound('Claim not found');
+  if (!claim.talentApproved && !claim.verdict) {
+    throw conflict('This line was never approved by the talent — it stays a draft and takes no verdict (Invariant 5)');
+  }
 
   const before = { verdict: claim.verdict, verdictNote: claim.verdictNote };
   claim.verdict = verdict;
@@ -321,11 +331,14 @@ export async function applyVerdict(actor, cardId, claimId, { verdict, note = nul
     note: `claim ${claimId}`,
   });
 
-  // BR-7: Confirmed is the only accepting verdict; card-level transition
-  // happens when every claim has a verdict.
-  const allDecided = card.claims.every((c) => c.verdict !== null);
+  // BR-7: Confirmed is the only accepting verdict; the card-level
+  // transition happens when every ROUTED line has one. Thin drafts the
+  // talent left behind (never approved, never verdicted) don't count —
+  // they were never routed.
+  const inPlay = card.claims.filter((c) => c.talentApproved || c.verdict !== null);
+  const allDecided = inPlay.length > 0 && inPlay.every((c) => c.verdict !== null);
   if (allDecided) {
-    const anyAdjust = card.claims.some((c) => c.verdict === 'Adjust');
+    const anyAdjust = inPlay.some((c) => c.verdict === 'Adjust');
     // C1 deadlock: the reviewer held Adjust on a claim the talent defended.
     const heldOnDefended =
       card.status === 'routed' &&
