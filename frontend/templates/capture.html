@@ -28,28 +28,39 @@
       {{#if chatBusy}}
         <p class="loading">thinking… (your words are already saved)</p>
       {{/if}}
-      <div class="sweep-actions" style="flex-wrap: wrap; margin-top: 0.75rem;">
-        <textarea value="{{chatInput}}" placeholder="{{chatDone ? 'Anything to add or fix? Just keep typing — or send it in.' : 'In your own words…'}}" style="flex: 2; min-height: 5rem;" disabled="{{chatBusy}}"></textarea>
-      </div>
-      <div class="sweep-actions" style="margin-top: 0.4rem;">
-        <button class="btn btn-primary" on-click="@this.sendChat()" disabled="{{chatBusy || !(chatInput || '').trim()}}">Send</button>
-        <span class="spacer"></span>
-        {{#if card.rawAnswers.length && !chatDone}}
-          <button class="btn btn-quiet" on-click="@this.wrapChat()" disabled="{{chatBusy}}">That's everything — wrap up</button>
-        {{/if}}
-      </div>
+      {{#if !chatDone || postWrapOpen}}
+        <div class="sweep-actions" style="flex-wrap: wrap; margin-top: 0.75rem;">
+          <textarea value="{{chatInput}}" placeholder="{{chatDone ? 'Your addition or fix — in your own words' : 'In your own words…'}}" style="flex: 2; min-height: 5rem;" disabled="{{chatBusy}}"></textarea>
+        </div>
+        <div class="sweep-actions" style="margin-top: 0.4rem;">
+          <button class="btn btn-primary" on-click="@this.sendChat()" disabled="{{chatBusy || !(chatInput || '').trim()}}">Send</button>
+          <span class="spacer"></span>
+          {{#if card.rawAnswers.length && !chatDone}}
+            <button class="btn btn-quiet" on-click="@this.wrapChat()" disabled="{{chatBusy}}">That's everything — wrap up</button>
+          {{/if}}
+          {{#if chatDone && postWrapOpen}}
+            <button class="btn btn-quiet" on-click="@this.set('postWrapOpen', false)">Never mind — close</button>
+          {{/if}}
+        </div>
+      {{else}}
+        <div class="sweep-actions" style="margin-top: 0.75rem;">
+          <button class="linkish" on-click="@this.set('postWrapOpen', true)">Anything to add or fix? Open the box and type it.</button>
+        </div>
+      {{/if}}
     </section>
 
     {{#if submitMessage}}<div class="banner banner-safe">{{submitMessage}}</div>{{/if}}
     {{#if submitError}}<div class="banner banner-warn">{{submitError}}</div>{{/if}}
 
-    <div class="submit-bar">
-      <span class="muted" style="font-size: var(--text-sm);">
-        Every word you send is saved as you go. When you send it in, the app turns your words into lines for you to check.
-      </span>
-      <span class="spacer"></span>
-      <button class="btn btn-primary" on-click="@this.submitCard()" disabled="{{!canSubmit}}">Send it in</button>
-    </div>
+    {{#if chatDone && canSubmit}}
+      <div class="submit-bar">
+        <span class="muted" style="font-size: var(--text-sm);">
+          That's everything. Sending it in turns your words into lines for you to check.
+        </span>
+        <span class="spacer"></span>
+        <button class="btn btn-primary" on-click="@this.submitCard()">Send it in</button>
+      </div>
+    {{/if}}
   {{else}}
   {{#if card.createdViaShellBy}}
     <p class="capture-shell-note">

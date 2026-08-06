@@ -24,6 +24,7 @@ const app = new Ractive({
     chatInput: '',
     chatBusy: false,
     chatDone: false,
+    postWrapOpen: false, // JP (Aug 6): after the wrap, the box collapses to a link
     ladder: null,
     quarters: {},
     quarterTags: [],
@@ -121,6 +122,8 @@ const app = new Ractive({
         chatDone: Boolean(result.turn?.done),
         canSubmit: Boolean(result.canSubmit),
       });
+      // A fresh wrap closes the box back down to the link.
+      if (result.turn?.done) this.set('postWrapOpen', false);
     } catch (err) {
       this.set('actionError', err.message);
     } finally {
@@ -528,6 +531,10 @@ async function loadCapture(cardId) {
   const track = home.track || { questionSet: [], competencyOrDomainList: [] };
 
   if (card.captureMode === 'conversation') {
+    // A refresh keeps the wrap state: the conversation is persisted, so
+    // "done" is read from it — the last saved turn being the AI's wrap.
+    const convo = card.conversation || [];
+    const lastSaved = convo[convo.length - 1];
     app.set({
       view: 'capture',
       card,
@@ -535,7 +542,8 @@ async function loadCapture(cardId) {
       summaryText: null,
       chatInput: '',
       chatBusy: false,
-      chatDone: false,
+      chatDone: lastSaved?.role === 'ai' && lastSaved?.kind === 'wrap',
+      postWrapOpen: false,
       canSubmit: (card.sweepAnswers || []).length > 0,
       saveState: 'idle',
     });
@@ -544,7 +552,6 @@ async function loadCapture(cardId) {
         .then((sum) => app.set('summaryText', sum ? sum.text : null))
         .catch(() => {});
     }
-    const convo = card.conversation || [];
     if (!convo.length || convo[convo.length - 1].role === 'talent') app.sendChat('');
     return;
   }
