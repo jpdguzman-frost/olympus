@@ -318,6 +318,34 @@ describe('structuring worker (AC-8: kill the AI, raw intact, retry succeeds)', (
     await structureOne(card, { client: fakeClient({ claims: [GOOD_CLAIM], followUps: [] }) });
     expect((await Card.findById(card._id)).calibrationHold).toBe(false);
   });
+
+  it('zero surviving claims on substantive words NEVER ships an empty write-up — it retries (JP live find, Aug 6)', async () => {
+    const card = await submittedCard(talent, 'Zero Claims Card');
+    // every emitted row fails FR-10 (quote not in the raw words) → 0 survive
+    const stubOut = { claims: [{ ...GOOD_CLAIM, sourceQuote: 'placeholder' }], followUps: [], signalsNoted: [] };
+    const result = await structureOne(card, { client: fakeClient(stubOut) });
+    expect(result.outcome).toBe('zero-claims-retry');
+    const stored = await Card.findById(card._id);
+    expect(stored.status).toBe('draft'); // the talent never sees "0 lines"
+    expect(stored.structuringAttempts).toBe(1);
+    expect(stored.nextStructuringAttemptAt).toBeTruthy();
+  });
+
+  it('after the retry cap, the card hands back to the talent honestly, in the chat', async () => {
+    const card = await submittedCard(talent, 'Zero Claims Gave Up');
+    card.structuringAttempts = 3;
+    await card.save();
+    const stubOut = { claims: [{ ...GOOD_CLAIM, sourceQuote: 'placeholder' }], followUps: [], signalsNoted: [] };
+    const result = await structureOne(await Card.findById(card._id), { client: fakeClient(stubOut) });
+    expect(result.outcome).toBe('zero-claims-gave-up');
+    const stored = await Card.findById(card._id);
+    expect(stored.status).toBe('draft');
+    expect(stored.submittedForStructuringAt).toBe(null); // the wait screen releases
+    expect(stored.structuringError).toMatch(/zero-claims/);
+    const lastTurn = stored.conversation[stored.conversation.length - 1];
+    expect(lastTurn.role).toBe('ai');
+    expect(lastTurn.text).toMatch(/every word you said is saved/);
+  });
 });
 
 describe('spot-check queue (replaces the FR-11 hold)', () => {

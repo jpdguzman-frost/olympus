@@ -204,6 +204,43 @@ export async function structureOne(card, { client } = {}) {
     const opts = client ? { client, capsScaffold } : { capsScaffold };
     const { claims, followUps, signalsNoted, rejected } = await structureCard(track, card, opts);
 
+    // JP's live find (Aug 6, JFC CRM card): a marginal input can leave
+    // ZERO surviving claims on substantive words — and an empty
+    // write-up screen is a broken promise. Never ship it. Retry with
+    // backoff (attempts are nondeterministic and usually land); after
+    // the cap, hand the card back to the talent honestly, in the chat.
+    const substantive = card.rawAnswers.map((a) => a.answer).join(' ').trim().length > 40;
+    if (claims.length === 0 && substantive) {
+      card.structuringAttempts += 1;
+      const rejectedNote = rejected.length ? ` (${rejected.length} row(s) rejected by the validation layer)` : '';
+      if (card.structuringAttempts >= 4) {
+        // Give up visibly: back to the chat with a plain note; the
+        // talent can add words or just send it in again. JP sees the
+        // error on the admin cards read.
+        card.submittedForStructuringAt = null;
+        card.nextStructuringAttemptAt = null;
+        card.structuringError = `zero-claims: nothing survived after ${card.structuringAttempts} attempts${rejectedNote}`;
+        card.conversation.push({
+          role: 'ai',
+          kind: 'wrap',
+          text: "I couldn't turn this into lines just now — a system hiccup, not you, and every word you said is saved. Add anything you like, or just send it in again in a little while.",
+        });
+        pushCardAudit(card, { by: null, action: 'structuring-zero-claims-gave-up', note: card.structuringError });
+        await card.save();
+        await recordAudit({
+          actorId: null, action: 'card.structuring-zero-claims', entity: 'card', entityId: card._id,
+          after: { attempts: card.structuringAttempts, gaveUp: true },
+        });
+        return { outcome: 'zero-claims-gave-up' };
+      }
+      const backoff = Math.min(BACKOFF_BASE_MS * 2 ** (card.structuringAttempts - 1), 15 * 60_000);
+      card.structuringError = `zero-claims: retrying${rejectedNote}`;
+      card.nextStructuringAttemptAt = new Date(Date.now() + backoff);
+      pushCardAudit(card, { by: null, action: 'structuring-zero-claims-retry', note: card.structuringError });
+      await card.save();
+      return { outcome: 'zero-claims-retry', attempt: card.structuringAttempts };
+    }
+
     card.claims = claims;
     card.followUps = followUps;
     card.signalsNoted = signalsNoted ?? []; // A4: noted, never claimed, never a penalty

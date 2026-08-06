@@ -25,6 +25,8 @@ const app = new Ractive({
     chatBusy: false,
     chatDone: false,
     postWrapOpen: false, // JP (Aug 6): after the wrap, the box collapses to a link
+    structuringWait: false, // sent — the page waits, then moves to the write-up on its own
+    structuringSlow: false,
     ladder: null,
     quarters: {},
     quarterTags: [],
@@ -165,10 +167,17 @@ const app = new Ractive({
       if (this.get('card.captureMode') !== 'conversation') await saveNow();
       const result = await api('POST', `/api/cards/${this.get('card._id')}/submit`);
       if (result.structuring === 'pending-p3') {
-        this.set(
-          'submitMessage',
-          'Saved. Your words are on record. In about a minute the app turns them into lines for you to check.',
-        );
+        if (this.get('card.captureMode') === 'conversation') {
+          // JP (Aug 6): the page waits visibly, then moves to the
+          // write-up screen on its own the moment the lines land.
+          this.set({ structuringWait: true, structuringSlow: false });
+          pollStructuring(this.get('card._id'));
+        } else {
+          this.set(
+            'submitMessage',
+            'Saved. Your words are on record. In about a minute the app turns them into lines for you to check.',
+          );
+        }
       }
     } catch (err) {
       this.set('submitError', err.message);
@@ -535,6 +544,7 @@ async function loadCapture(cardId) {
     // "done" is read from it — the last saved turn being the AI's wrap.
     const convo = card.conversation || [];
     const lastSaved = convo[convo.length - 1];
+    const waiting = Boolean(card.submittedForStructuringAt); // sent, lines not landed yet
     app.set({
       view: 'capture',
       card,
@@ -544,9 +554,15 @@ async function loadCapture(cardId) {
       chatBusy: false,
       chatDone: lastSaved?.role === 'ai' && lastSaved?.kind === 'wrap',
       postWrapOpen: false,
+      structuringWait: waiting,
+      structuringSlow: false,
       canSubmit: (card.sweepAnswers || []).length > 0,
       saveState: 'idle',
     });
+    if (waiting) {
+      pollStructuring(card._id);
+      return; // no new chat turn while the write-up is being made
+    }
     if (card.subject.name) {
       api('GET', `/api/caps/summary?project=${encodeURIComponent(card.subject.name)}`)
         .then((sum) => app.set('summaryText', sum ? sum.text : null))
@@ -632,6 +648,32 @@ function pollDetailSoon(ms = 20000) {
   pollTimer = setTimeout(() => {
     if (app.get('view') === 'detail') app.refreshDetail().catch(() => {});
   }, ms);
+}
+
+/**
+ * After "Send it in": watch the card until the structurer lands, then
+ * move to the write-up screen on its own (JP, Aug 6). ~96s in, soften
+ * the message — the worker retries on its own; nothing is lost.
+ */
+let structuringTimer = null;
+function pollStructuring(cardId, attempt = 0) {
+  clearTimeout(structuringTimer);
+  structuringTimer = setTimeout(async () => {
+    if (app.get('view') !== 'capture' || String(app.get('card._id')) !== String(cardId)) return;
+    try {
+      const card = await api('GET', `/api/cards/${cardId}`);
+      // Moved on → the write-up screen. Handed back (zero-lines give-up)
+      // → the chat, with the AI's plain note and the send bar back.
+      if (card.status !== 'draft' || !card.submittedForStructuringAt) {
+        await loadCapture(cardId);
+        return;
+      }
+    } catch (err) {
+      /* transient — keep watching */
+    }
+    if (attempt >= 11) app.set('structuringSlow', true);
+    pollStructuring(cardId, attempt + 1);
+  }, 8000);
 }
 
 /** The quote, shown inside the conversation it came from. */

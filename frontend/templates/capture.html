@@ -28,7 +28,20 @@
       {{#if chatBusy}}
         <p class="loading">thinking… (your words are already saved)</p>
       {{/if}}
-      {{#if !chatDone || postWrapOpen}}
+      {{#if structuringWait}}
+        <div class="sweep-panel" style="margin-top: 0.75rem;">
+          <p class="loading" style="margin-bottom: 0.4rem;">writing your lines…</p>
+          <p class="muted" style="font-size: var(--text-sm); margin: 0;">
+            {{#if structuringSlow}}
+              Taking a bit longer than usual — still working, and your words are safe.
+              You can leave this page; the write-up lands on your home when it's ready.
+            {{else}}
+              Usually under a minute. This page moves to your write-up on its own.
+              You can also leave — it'll be on your home.
+            {{/if}}
+          </p>
+        </div>
+      {{elseif !chatDone || postWrapOpen}}
         <div class="sweep-actions" style="flex-wrap: wrap; margin-top: 0.75rem;">
           <textarea value="{{chatInput}}" placeholder="{{chatDone ? 'Your addition or fix — in your own words' : 'In your own words…'}}" style="flex: 2; min-height: 5rem;" disabled="{{chatBusy}}"></textarea>
         </div>
@@ -52,7 +65,7 @@
     {{#if submitMessage}}<div class="banner banner-safe">{{submitMessage}}</div>{{/if}}
     {{#if submitError}}<div class="banner banner-warn">{{submitError}}</div>{{/if}}
 
-    {{#if chatDone && canSubmit}}
+    {{#if chatDone && canSubmit && !structuringWait}}
       <div class="submit-bar">
         <span class="muted" style="font-size: var(--text-sm);">
           That's everything. Sending it in turns your words into lines for you to check.
