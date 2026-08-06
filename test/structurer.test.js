@@ -37,6 +37,8 @@ function fakeClient(result) {
   };
 }
 
+function agent() { return talent; }
+
 async function submittedCard(agent, subjectName = 'GCash') {
   const card = (await agent.post('/api/cards').send({ subjectName, closeDate: '2026-06-30' })).body.data;
   await agent.patch(`/api/cards/${card._id}`).send({
@@ -76,6 +78,34 @@ beforeEach(async () => {
 });
 
 afterAll(() => ctx.teardown());
+
+describe('calibration corrections count toward the GATE-1 streak', () => {
+  it('an edit increments the correction counter and keeps the anchor; release with zero stays clean', async () => {
+    const { correctClaim, cleanStreaks, releaseCard } = await import('../src/services/calibrationService.js');
+    const { User } = await import('../src/models/User.js');
+    const admin = await User.findOne({ email: 'admin@frostdesigngroup.com' });
+
+    const card = await submittedCard(agent(), 'Calib Counter Card');
+    card.claims.push({
+      type: 'claim', competencyOrDomain: 'build-ops', labels: { execution: 'Someone checks behind me' },
+      sourceQuote: 'I run it weekly.', anchorText: 'GCash, April 2026', anchorSource: 'structurer', flags: [],
+    });
+    card.calibrationHold = true;
+    await card.save();
+
+    await correctClaim(admin, card._id, card.claims[0]._id, { action: 'edit', labels: { execution: 'I run it' } });
+    const { Card } = await import('../src/models/Card.js');
+    const stored = await Card.findById(card._id);
+    expect(stored.calibrationCorrections).toBe(1);
+    expect(stored.claims[0].anchorText).toBe('GCash, April 2026'); // the anchor rides through
+    expect(stored.claims[0].labels.execution).toBe('I run it');
+
+    await releaseCard(admin, card._id);
+    const streaks = await cleanStreaks();
+    const ops = streaks.find((t) => t.track === 'ops');
+    expect(ops.cleanStreak).toBe(0); // corrected card broke the streak
+  });
+});
 
 describe('collapse rescue (one retry with the minimal render)', () => {
   function stubThenGood() {

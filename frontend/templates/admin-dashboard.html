@@ -137,6 +137,15 @@
     </section>
 
     <section>
+      <div class="section-label">Calibration — the exit gate</div>
+      <div class="record-meta" style="margin-bottom: 0.75rem;">
+        {{#each calibrationStreaks}}
+          <span class="tag">{{.label}}: {{.cleanStreak}} clean in a row · {{.distinctTalents}} talent(s) — gate is 5 across 3{{#if !.calibrationMode}} · OFF{{/if}}</span>
+        {{/each}}
+      </div>
+    </section>
+
+    <section>
       <div class="section-label">Calibration queue <span class="count">{{calibration.length}}</span></div>
       {{#if calibration.length}}
         {{#each calibration}}
@@ -150,6 +159,35 @@
               <span>pack {{.packVersion}}</span>
               <span>{{.claims.length}} claims</span>
             </div>
+
+            {{#if .captureMode === 'conversation' && .conversation.length}}
+              <div style="border-top: 1px solid var(--rule); margin-top: 0.75rem; padding-top: 0.5rem;">
+                <button class="btn btn-quiet" on-click="@this.toggle('calibration.' + @index + '.showConvo')">
+                  {{#if .showConvo}}Hide{{else}}Show{{/if}} the whole conversation ({{.conversation.length}} turns)
+                </button>
+                {{#if .showConvo}}
+                  {{#each .conversation}}
+                    <p style="font-size: var(--text-sm); margin: 0.4rem 0 0; {{#if .role === 'talent'}}border-left: 3px solid var(--carbon); padding-left: 0.6rem;{{/if}}">
+                      <span class="meta">{{#if .role === 'ai'}}OLYMPUS{{else}}TALENT{{/if}}</span><br />{{.text}}
+                    </p>
+                  {{/each}}
+                {{/if}}
+              </div>
+            {{elseif .rawAnswers.length}}
+              <div style="border-top: 1px solid var(--rule); margin-top: 0.75rem; padding-top: 0.5rem;">
+                <button class="btn btn-quiet" on-click="@this.toggle('calibration.' + @index + '.showConvo')">
+                  {{#if .showConvo}}Hide{{else}}Show{{/if}} the talent's full answers
+                </button>
+                {{#if .showConvo}}
+                  {{#each .rawAnswers}}
+                    <p style="font-size: var(--text-sm); margin: 0.4rem 0 0;"><span class="meta">{{.question}}</span><br />{{.answer}}</p>
+                  {{/each}}
+                  {{#each .sweepAnswers}}
+                    <p style="font-size: var(--text-sm); margin: 0.4rem 0 0;"><span class="meta">SWEEP</span><br />{{.answer}}</p>
+                  {{/each}}
+                {{/if}}
+              </div>
+            {{/if}}
 
             {{#each .claims}}
               <div style="border-top: 1px solid var(--rule); padding-top: 0.75rem; margin-top: 0.75rem;">
@@ -179,6 +217,32 @@
         <div class="empty-state">
           Nothing waiting. While calibration is on, new cards stop here first. Five clean cards in a row, across three talents, ends calibration.
         </div>
+      {{/if}}
+    </section>
+
+    <section>
+      <div class="section-label">Correction log <span class="count">{{correctionLog.length}}</span></div>
+      {{#if correctionLog.length}}
+        <div class="table-scroll">
+          <table class="ledger">
+            <thead><tr><th>When</th><th>Card</th><th>What</th><th>Change</th></tr></thead>
+            <tbody>
+              {{#each correctionLog}}
+                <tr>
+                  <td class="meta">{{fmtDate(.at)}}</td>
+                  <td>{{.cardSubject}}</td>
+                  <td class="meta">{{.action}}</td>
+                  <td class="meta" style="max-width: 30rem; overflow: hidden; text-overflow: ellipsis;">{{JSON.stringify(.after || .before)}}</td>
+                </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted" style="font-size: var(--text-xs); margin-top: 0.5rem;">
+          Every fix here is a permanent regression case — it feeds the behavior rules you publish, and the final version locks in at GATE-1.
+        </p>
+      {{else}}
+        <div class="empty-state">No fixes yet. Clean releases build the exit streak above.</div>
       {{/if}}
     </section>
 

@@ -201,6 +201,7 @@ const cardSchema = new Schema(
     // FR-11: while calibration mode is on, structured cards hold for admin
     // review before the talent sees the claims.
     calibrationHold: { type: Boolean, default: false },
+    calibrationCorrections: { type: Number, default: 0 }, // GATE-1: a clean card has zero
     calibrationReleasedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     calibrationReleasedAt: { type: Date, default: null },
     // C1: JP's ruling on a deadlocked card — guidance on the record,

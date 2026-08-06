@@ -186,6 +186,18 @@ router.patch('/api/admin/tracks/:key/settings', async (req, res, next) => {
   }
 });
 
+// GATE-1 progress + the correction log (Pack §E feed)
+router.get('/api/admin/calibration-insight', async (req, res, next) => {
+  try {
+    sendSuccess(res, {
+      streaks: await calibration.cleanStreaks(),
+      corrections: await calibration.correctionLog(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- Calibration review (FR-11; admin-only per Plan §4 matrix) ---
 router.get('/api/admin/calibration', async (req, res, next) => {
   try {

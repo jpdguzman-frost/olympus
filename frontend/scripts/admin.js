@@ -15,6 +15,9 @@ const app = new Ractive({
     calibration: [],
     pendingVerdicts: [],
     capsStatus: null,
+    calibrationStreaks: [],
+    correctionLog: [],
+    JSON,
     statusLabel,
     roleOptions: ['talent', 'lead', 'nonadvocate', 'admin'],
     newUser: { name: '', email: '', roles: [], track: '', leadId: '' },
@@ -160,13 +163,14 @@ const app = new Ractive({
 });
 
 async function refresh() {
-  const [users, tracks, audit, calibration, pendingVerdicts, capsStatus] = await Promise.all([
+  const [users, tracks, audit, calibration, pendingVerdicts, capsStatus, insight] = await Promise.all([
     api('GET', '/api/admin/users'),
     api('GET', '/api/admin/tracks'),
     api('GET', '/api/admin/audit'),
     api('GET', '/api/admin/calibration'),
     api('GET', '/api/admin/pending-verdicts'),
     api('GET', '/api/admin/caps-status').catch(() => null),
+    api('GET', '/api/admin/calibration-insight').catch(() => ({ streaks: [], corrections: [] })),
   ]);
   app.set({
     users,
@@ -175,6 +179,8 @@ async function refresh() {
     calibration,
     pendingVerdicts,
     capsStatus,
+    calibrationStreaks: insight.streaks || [],
+    correctionLog: insight.corrections || [],
     leads: users.filter((u) => u.roles.includes('lead') && u.active),
     activeUsers: users.filter((u) => u.active),
   });
