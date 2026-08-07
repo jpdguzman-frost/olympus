@@ -143,6 +143,37 @@ describe('bolt-in thread dismiss (JP, Aug 6: toggle it off)', () => {
   });
 });
 
+describe('claimed signal put-back (JP, Aug 7: undo before you type)', () => {
+  it('Yes seeds the line thread; put-back restores the notice and clears the seed', async () => {
+    const card = await docCard('Signal Put Back');
+    const stored = await Card.findById(card._id);
+    stored.signalsNoted.push({
+      signal: 'Runs the weekly sync',
+      sourceQuote: 'I ran the weekly builds myself.',
+      competencyOrDomain: 'placeholder-from-pack',
+      at: new Date(),
+    });
+    await stored.save();
+    const claimId = stored.claims[0]._id.toString();
+
+    const seeded = await agents.talentA
+      .post(`/api/cards/${card._id}/claims/${claimId}/thread`)
+      .send({ signal: 'Runs the weekly sync' });
+    expect(seeded.status).toBe(200);
+    const afterSeed = await Card.findById(card._id);
+    expect(afterSeed.signalsNoted[0].talentSaid).toBe('claimed');
+    expect(afterSeed.claims[0].thread).toHaveLength(1); // the AI seed
+
+    const putBack = await agents.talentA
+      .post(`/api/cards/${card._id}/signals/decide`)
+      .send({ signal: 'Runs the weekly sync', action: 'put-back' });
+    expect(putBack.status).toBe(200);
+    const restored = await Card.findById(card._id);
+    expect(restored.signalsNoted[0].talentSaid).toBe(null); // the notice is back
+    expect(restored.claims[0].thread).toHaveLength(0); // seed gone, no residue
+  });
+});
+
 describe('per-line checker fan-out (one non-advocate per line)', () => {
   let card;
   let lineA;

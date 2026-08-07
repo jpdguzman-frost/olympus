@@ -289,11 +289,6 @@ export async function lineThread(actor, cardId, claimId, { text = null, close = 
     throw conflict('This line is already being re-checked — the answer lands here shortly');
   }
 
-  const track = await Track.findOne({ key: card.track });
-  if (!track || !trackReadyForStructuring(track)) {
-    throw conflict('The assistant is not ready on this track yet — ask JP');
-  }
-
   // JP (Aug 6): a noticed signal on this line — claiming it opens the
   // thread WITH the signal as the seed, no AI call needed. The talent
   // answers in their own words; the re-check reads everything.
@@ -306,6 +301,11 @@ export async function lineThread(actor, cardId, claimId, { text = null, close = 
     pushCardAudit(card, { by: actor._id, action: 'signal-claim-opened', note: sig.signal });
     await card.save();
     return { card, claim, turn: { message: seed, ready: false } };
+  }
+
+  const track = await Track.findOne({ key: card.track });
+  if (!track || !trackReadyForStructuring(track)) {
+    throw conflict('The assistant is not ready on this track yet — ask JP');
   }
 
   if (text?.trim()) {
@@ -390,9 +390,38 @@ export async function decideSignal(actor, cardId, { signal = null, action = null
   if (card.status !== 'structured') {
     throw conflict(`Noticed items are answered while you check the write-up (status "${card.status}")`);
   }
-  if (action !== 'not-mine') throw badRequest('The only answer here is not-mine — claiming opens a thread instead');
   const sig = card.signalsNoted.find((s) => s.signal === String(signal ?? '').trim());
   if (!sig) throw notFound('That noticed item is no longer here');
+
+  // JP (Aug 7): clicked "Yes" and changed your mind — put it back. Only
+  // while nothing has been said yet; the unanswered seed leaves the
+  // thread and the notice returns.
+  if (action === 'put-back') {
+    if (sig.talentSaid !== 'claimed') throw conflict('Nothing to put back here');
+    const seedPrefix = `You said "${sig.sourceQuote}" — that sounds like: ${sig.signal}.`;
+    let popped = false;
+    for (const claim of card.claims) {
+      const last = claim.thread?.[claim.thread.length - 1];
+      if (last?.role === 'ai' && last.text.startsWith(seedPrefix)) {
+        claim.thread.pop();
+        popped = true;
+      }
+    }
+    const openFromSignal = card.boltInThreads.find((t) => t.fromSignal === sig.signal && t.status === 'open');
+    if (openFromSignal && !openFromSignal.thread.some((t) => t.role === 'talent')) {
+      card.boltInThreads.pull(openFromSignal._id);
+      popped = true;
+    }
+    if (!popped) {
+      throw conflict('You already said something here — finish the thread, or remove the line it made');
+    }
+    sig.talentSaid = null;
+    pushCardAudit(card, { by: actor._id, action: 'signal-put-back', note: sig.signal });
+    await card.save();
+    return card;
+  }
+
+  if (action !== 'not-mine') throw badRequest('The answers here are not-mine or put-back — claiming opens a thread instead');
   sig.talentSaid = 'not-mine';
   pushCardAudit(card, { by: actor._id, action: 'signal-not-mine', note: sig.signal });
   await card.save();

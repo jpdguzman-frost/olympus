@@ -224,6 +224,10 @@
                   {{#if hasThreadWords(this)}}
                     <button class="btn btn-secondary" on-click="@this.threadClose(this, ci)">That's it — re-check the line now</button>
                   {{/if}}
+                  {{#if .seedSignal}}
+                    <span class="spacer"></span>
+                    <button class="btn btn-quiet" on-click="@this.putBackSignal(this)">Never mind — put it back</button>
+                  {{/if}}
                 </div>
               </div>
             {{/if}}

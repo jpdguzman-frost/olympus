@@ -314,6 +314,7 @@ const app = new Ractive({
       });
       this.set(`card.claims.${ci}.thread`, result.thread);
       this.set(`card.claims.${ci}.threadOpen`, true);
+      this.set(`card.claims.${ci}.seedSignal`, sig.signal);
       this.set(`card.claims.${ci}.lineSignals`, (claim.lineSignals || []).filter((s) => s.signal !== sig.signal));
     } catch (err) {
       this.set('actionError', err.message);
@@ -324,6 +325,20 @@ const app = new Ractive({
     this.set({ notice: null, actionError: null });
     try {
       await api('POST', `/api/cards/${this.get('card._id')}/signals/decide`, { signal: sig.signal, action: 'not-mine' });
+      await this.refreshDetail();
+    } catch (err) {
+      this.set('actionError', err.message);
+    }
+  },
+
+  // JP (Aug 7): clicked Yes and changed your mind — the notice comes back.
+  async putBackSignal(claim) {
+    this.set({ notice: null, actionError: null });
+    try {
+      await api('POST', `/api/cards/${this.get('card._id')}/signals/decide`, {
+        signal: claim.seedSignal,
+        action: 'put-back',
+      });
       await this.refreshDetail();
     } catch (err) {
       this.set('actionError', err.message);
@@ -562,7 +577,18 @@ async function loadCapture(cardId) {
     // pre-expanded and sort first; ready lines collapse to name + state
     // + quote, their reasoning one tap away.
     for (const c of card.claims || []) {
-      c.needsYou = !c.verdict && (c.aside || c.needsRelook || (c.lineSignals || []).length > 0);
+      // Refresh keeps an in-progress thread open (JP, Aug 7): a thread
+      // whose last turn is the AI — a claimed-signal seed, or a question
+      // awaiting the talent — reopens by itself.
+      const lastT = (c.thread || [])[(c.thread || []).length - 1];
+      c.seedSignal =
+        lastT?.role === 'ai' && lastT.text.includes('— that sounds like: ')
+          ? lastT.text.split('— that sounds like: ')[1]?.split('. Say a bit more')[0] ?? null
+          : null;
+      c.threadOpen = Boolean(
+        card.status === 'structured' && lastT && lastT.role === 'ai' && (c.seedSignal || !(c.contentions || []).length),
+      );
+      c.needsYou = !c.verdict && (c.aside || c.needsRelook || (c.lineSignals || []).length > 0 || c.threadOpen);
       c.expanded = c.needsYou;
     }
     if (isDocScreen && card.status === 'structured') {
